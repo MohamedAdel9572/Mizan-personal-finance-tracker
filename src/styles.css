@@ -89,9 +89,15 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
 .desktop-only { display: none !important; }
 
 @media (min-width: 900px) {
-  .layout { display: grid; grid-template-columns: var(--sidebar) 1fr; }
+  /* the sidebar column's colour runs the full page height, so the sidebar itself can keep one height */
+  .layout {
+    display: grid; grid-template-columns: var(--sidebar) 1fr;
+    background: linear-gradient(to right, var(--surface) 0 calc(var(--sidebar) - 1px), var(--border) calc(var(--sidebar) - 1px) var(--sidebar), transparent var(--sidebar));
+  }
+  /* 100svh, not 100dvh: tablets and phones show/hide the address bar while scrolling, and a 100dvh
+     sidebar changed height each time, making the name and Sign out at the bottom jump up and down */
   .sidebar {
-    display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100dvh;
+    display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; height: 100svh;
     padding: 20px 12px; background: var(--surface); border-right: 1px solid var(--border);
   }
   .sidebar nav { display: flex; flex-direction: column; gap: 2px; flex: 1; margin-top: 20px; }
