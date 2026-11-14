@@ -7,6 +7,9 @@ import { compareAll, type MonthComparison } from "../engine/compare.ts";
 import { PlanTimeline, versionFromRow, type PlanVersionRow } from "../engine/plan.ts";
 import type { ActualMonth, ActualsInput, Checkin, PlanVersion } from "../engine/types.ts";
 import type { Api } from "./api.ts";
+import { Dec } from "../engine/decimal.ts";
+import { valueHoldings } from "../engine/gold.ts";
+import { effectivePrices, toHoldings, type HoldingRow, type PriceRow } from "./gold.ts";
 
 export interface Profile {
   id: string;
@@ -48,6 +51,8 @@ export interface AppData {
   unplanned: UnplannedRow[];
   actuals: ActualMonth[];
   comparisons: MonthComparison[];
+  /** gold at today's price, when every karat you own has a price */
+  goldValue: Dec | null;
 }
 
 export async function loadProfile(api: Api): Promise<Profile | null> {
@@ -56,9 +61,11 @@ export async function loadProfile(api: Api): Promise<Profile | null> {
 }
 
 export async function loadData(api: Api, profile: Profile): Promise<AppData> {
-  const [versionRows, actualRows] = await Promise.all([
+  const [versionRows, actualRows, goldRows, priceRows] = await Promise.all([
     api.rpc<(PlanVersionRow & { id: number; note: string; created_at: string })[]>("get_plan_versions"),
     api.rpc<ActualsRow>("get_actuals"),
+    api.rpc<HoldingRow[]>("get_gold_holdings").catch(() => [] as HoldingRow[]),
+    api.rpc<PriceRow[]>("get_gold_prices").catch(() => [] as PriceRow[]),
   ]);
 
   const versions: VersionInfo[] = versionRows.map((r) => ({
@@ -76,7 +83,27 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
     entries.set(e.month, m);
   }
 
+  // Gold at today's price replaces the planned gold value in the latest logged month's net worth
+  const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date());
+  const owned = goldRows.filter((g) => !g.sold_date);
+  const gold = owned.length ? valueHoldings(toHoldings(owned), effectivePrices(priceRows), "0", todayIso) : null;
+  const goldValue = gold && gold.missingPrices.length === 0 ? gold.market : null;
+  const assetValues: Record<string, string> = {};
+  const lastChecked = actualRows.checkins.map((c) => c.month).sort().at(-1);
+  if (goldValue && lastChecked && timeline) {
+    const planned = timeline.planned(lastChecked);
+    const version = timeline.versionFor(lastChecked);
+    if (planned && version) {
+      let other = Dec.ZERO;
+      for (const item of version.items) {
+        if (item.kind === "asset" && !/gold|ذهب/i.test(item.name)) other = other.plus(planned.lines.get(item.key) ?? Dec.ZERO);
+      }
+      assetValues[lastChecked] = goldValue.plus(other).toString();
+    }
+  }
+
   const input: ActualsInput = {
+    assetValues,
     checkins: actualRows.checkins.map((c) => ({ month: c.month, savingsBalance: c.savings_balance })),
     entries: actualRows.entries.map((e) => ({ month: e.month, itemKey: e.item_key, amount: e.amount })),
     unplanned: actualRows.unplanned.map((u) => ({ month: u.month, kind: u.kind, name: u.name, amount: u.amount })),
@@ -93,5 +120,6 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
     unplanned: actualRows.unplanned,
     actuals,
     comparisons,
+    goldValue,
   };
 }

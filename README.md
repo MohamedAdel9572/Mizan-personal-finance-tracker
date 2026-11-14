@@ -13,8 +13,10 @@ goal tracking and gold holdings. Static Vite + TypeScript PWA on Vercel, Supabas
 | 3 | Sign in/up, settings, Plan (grid + editor), Log actuals, Plan vs actual | done |
 | 4 | Dashboard, statistics | |
 | 5 | Excel template download + import (template or your own month-grid sheet) | done early |
-| 5 | Gold live price Edge Function, Gold screen with value and profit/loss, Excel export | |
-| 6 | History, polish, responsive checks | |
+| 5 | Gold screen: your price per gram, value, profit/loss; net worth uses it | done |
+| 5 | Automatic gold price (Edge Function + API), Excel export | next |
+| 6 | History timeline + months | done early |
+| 6 | Polish, responsive checks | |
 
 ## Project layout
 

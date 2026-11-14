@@ -351,3 +351,65 @@ details.card summary { cursor: pointer; min-height: 32px; }
 .manage-row p { margin: 2px 0 0; }
 .manage-row .btn { flex: none; }
 @media (max-width: 640px) { .manage-row { flex-direction: column; align-items: stretch; } }
+
+/* native dropdown list follows the theme (Windows Chrome draws it white otherwise) */
+select option, select optgroup { background-color: var(--surface); color: var(--text); }
+
+/* "More" menu */
+.menu { position: relative; }
+.menu > summary { list-style: none; font-size: 1.4rem; border: 1px solid var(--border); }
+.menu > summary::-webkit-details-marker { display: none; }
+.menu[open] > summary { background: var(--surface-2); }
+.menu-list {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; width: min(320px, 86vw); padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgb(0 0 0 / 30%);
+}
+.menu-list button {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: var(--tap); padding: 10px 12px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.menu-list button:hover:not(:disabled), .menu-list button:focus-visible { background: var(--surface-2); }
+.menu-list button:disabled { opacity: .5; cursor: default; }
+.menu-list .danger-item strong { color: var(--bad); }
+
+/* gold */
+.price-card { margin-bottom: 16px; max-width: 720px; }
+.price-rows { display: grid; gap: 4px; margin: 8px 0 12px; }
+.price-row { display: grid; grid-template-columns: 1fr minmax(140px, 200px); align-items: center; gap: 12px; margin: 0; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.price-row > span:first-child { display: flex; flex-direction: column; }
+.price-row input { margin: 0; text-align: right; padding-right: 48px; }
+.link-card { color: var(--text); font-weight: 400; }
+.link-card:hover { border-color: var(--accent); text-decoration: none; }
+@media (max-width: 640px) {
+  .gold-table thead { display: none; }
+  .gold-table tr { display: grid; grid-template-columns: repeat(3, 1fr); padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .gold-table th, .gold-table td { border: 0; padding: 2px 4px; text-align: left; }
+  .gold-table th { grid-column: 1 / -1; }
+  .gold-table td::before { content: attr(data-label); display: block; font-size: .7rem; color: var(--muted); }
+  .months-history thead { display: none; }
+  .months-history tr { display: grid; grid-template-columns: repeat(2, 1fr); padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .months-history th, .months-history td { border: 0; padding: 2px 4px; text-align: left; }
+  .months-history th { grid-column: 1 / -1; }
+  .months-history td::before { content: attr(data-label); display: block; font-size: .7rem; color: var(--muted); }
+}
+
+/* history */
+.tabs { margin-bottom: 16px; }
+.tabs a { display: grid; place-items: center; min-height: 38px; padding: 0 18px; border-radius: 8px; color: var(--muted); font-weight: 600; }
+.tabs a.on { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+.tabs a:hover { text-decoration: none; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+.filters label { min-width: 180px; flex: 1; max-width: 260px; }
+.timeline { list-style: none; margin: 0; padding: 0; max-width: 820px; }
+.tl-day { margin: 18px 0 8px; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.tl-item { display: flex; gap: 12px; padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+.tl-icon { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--surface-2); color: var(--muted); font-weight: 700; }
+.cat-plan .tl-icon { background: var(--accent-soft); color: var(--accent); }
+.cat-actuals .tl-icon { background: var(--good-soft); color: var(--good); }
+.cat-unplanned .tl-icon { background: var(--bad-soft); color: var(--bad); }
+.cat-gold .tl-icon { background: var(--warn-soft); color: var(--warn); }
+.cat-import .tl-icon { background: var(--info-soft); color: var(--accent); }
+.tl-body { min-width: 0; flex: 1; }
+.tl-title { font-weight: 600; overflow-wrap: anywhere; }
+.tl-body details { margin-top: 4px; }
+.tl-body summary { cursor: pointer; color: var(--accent); min-height: 28px; }

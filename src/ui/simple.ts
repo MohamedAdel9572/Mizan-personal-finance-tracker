@@ -26,7 +26,8 @@ export function renderDashboard(root: HTMLElement, ctx: Ctx): void {
     ${notLogged ? `<div class="alert info notice-row"><span><strong>${esc(monthLabel(now, true))}</strong> isn't logged yet.</span><a class="btn primary small" href="#/log/${now}">Log it</a></div>` : ""}
     <div class="stats-grid">
       <div class="card stat"><span class="stat-label">Net worth</span><span class="stat-value num">${egp(netWorth)}</span>
-        <span class="small muted">${lastActual ? `actual, ${esc(monthLabel(lastActual.month, true))}` : "planned"}</span></div>
+        <span class="small muted">${lastActual ? `actual, ${esc(monthLabel(lastActual.month, true))}${ctx.data.goldValue ? ", gold at today's price" : ""}` : "planned"}</span></div>
+      ${ctx.data.goldValue ? `<a class="card stat link-card" href="#/gold"><span class="stat-label">Gold now</span><span class="stat-value num">${egp(ctx.data.goldValue)}</span><span class="small muted">at your price per gram</span></a>` : ""}
       ${last ? `
       <div class="card stat"><span class="stat-label">Last month vs plan</span><span class="stat-value num ${last.net.gap.isNegative() ? "neg" : "pos"}">${signed(last.net.gap)}</span>
         <span class="small muted">${esc(monthLabel(last.month, true))} net</span></div>

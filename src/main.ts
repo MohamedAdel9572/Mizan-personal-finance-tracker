@@ -7,10 +7,11 @@ import { renderLogin, renderSignup } from "./ui/auth.ts";
 import { renderCompare } from "./ui/compare.ts";
 import type { Ctx } from "./ui/context.ts";
 import { renderGold } from "./ui/gold.ts";
+import { renderHistory } from "./ui/history.ts";
 import { renderLog } from "./ui/log.ts";
 import { discardPlanDraft, hasUnsavedPlan, renderPlan } from "./ui/plan.ts";
 import { loadingHtml, shellHtml } from "./ui/shell.ts";
-import { applyTheme, renderComingSoon, renderDashboard, renderSettings } from "./ui/simple.ts";
+import { applyTheme, renderDashboard, renderSettings } from "./ui/simple.ts";
 
 const app = document.getElementById("app")!;
 const url = (import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
@@ -24,7 +25,7 @@ const SCREENS: Record<string, (root: HTMLElement, ctx: Ctx) => void> = {
   log: renderLog,
   compare: renderCompare,
   gold: renderGold,
-  history: renderComingSoon("History", "A timeline of every plan version, edit and upload arrives in step 6."),
+  history: renderHistory,
 };
 
 if (!url || !key) {
@@ -121,6 +122,16 @@ function start(api: Api): void {
       showLoadError(e);
     }
   }
+
+  // close an open "More" menu when clicking anywhere else
+  document.addEventListener("click", (e) => {
+    document.querySelectorAll<HTMLDetailsElement>("details.menu[open]").forEach((m) => {
+      if (!m.contains(e.target as Node) || (e.target as HTMLElement).closest(".menu-list button")) m.open = false;
+    });
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") document.querySelectorAll<HTMLDetailsElement>("details.menu[open]").forEach((m) => (m.open = false));
+  });
 
   // Sign out from the sidebar (desktop) or the top bar (phone)
   app.addEventListener("click", async (e) => {

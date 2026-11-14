@@ -91,6 +91,15 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
         <a class="btn ghost" href="#/plan/import">Import Excel</a>
         <a class="btn ghost" href="/Mizan-template.xlsx" download>Template</a>
         <a class="btn primary" href="#/plan/edit">Edit plan</a>
+        <details class="menu">
+          <summary class="icon-btn" aria-label="More plan actions" title="More">⋯</summary>
+          <div class="menu-list" role="menu">
+            <button type="button" role="menuitem" id="undo-version" ${versions.length > 1 ? "" : "disabled"}>
+              <strong>Undo last change</strong><span class="muted small">${versions.length > 1 ? `Delete version ${versions[0]!.version.versionNo}; version ${versions[1]!.version.versionNo} becomes current` : "Only one version, nothing to undo"}</span></button>
+            <button type="button" role="menuitem" id="delete-plan" class="danger-item">
+              <strong>Delete plan</strong><span class="muted small">All versions, logged months and unplanned items. Gold is kept.</span></button>
+          </div>
+        </details>
       </div>
     </div>
     ${info !== versions[0] ? `<p class="notice">You are looking at an older version. Months from ${esc(monthLabel(v.effectiveFrom, true))} were compared with it until a newer version took over.</p>` : ""}
@@ -126,22 +135,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
         </div>`).join("")}
       </div>
     </section>
-
-    <section class="card danger-zone manage-plan">
-      <h2>Manage plan</h2>
-      <div class="manage-row">
-        <div><strong>Undo the last change</strong>
-          <p class="muted small">${versions.length > 1
-            ? `Deletes version ${versions[0]!.version.versionNo}. Version ${versions[1]!.version.versionNo} becomes current again. Your logged months are kept.`
-            : "You only have one version, so there is nothing to undo."}</p></div>
-        <button class="btn ghost" id="undo-version" ${versions.length > 1 ? "" : "disabled"}>Delete version ${versions[0]!.version.versionNo}</button>
-      </div>
-      <div class="manage-row">
-        <div><strong>Delete the whole plan</strong>
-          <p class="muted small">Deletes every version, logged month and unplanned item. Your gold pieces are kept. This can't be undone.</p></div>
-        <button class="btn danger" id="delete-plan">Delete plan</button>
-      </div>
-    </section>`;
+`;
 
   root.querySelector("#undo-version")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget as HTMLButtonElement;
