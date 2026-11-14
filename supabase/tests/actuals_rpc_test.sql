@@ -66,6 +66,22 @@ select test.throws($$select public.add_unplanned('2026-07', 'loan', 'x', '1')$$,
 select test.throws($$select public.add_unplanned('2026-07', 'expense', '', '1')$$, '%Name is required%', 'empty name rejected');
 select test.throws($$select public.add_unplanned('2026-07', 'expense', 'x', '0')$$, '%more than 0%', 'zero amount rejected');
 
+\echo '--- clear_month (014)'
+select public.save_checkin('2026-08',
+  '[{"item_key": "11111111-1111-4111-8111-111111111111", "amount": "28000"}]', '150000', 'second month');
+select test.eq(jsonb_array_length(public.get_actuals()->'checkins')::text, '2', 'two months logged before clearing');
+select test.eq(public.clear_month('2026-07')::text, '{"lines": 2, "checkin": 1, "unplanned": 1}', 'clear_month reports what it removed');
+select test.eq((select count(*) from public.actual_entries where month = '2026-07-01')::text, '0', 'July amounts removed');
+select test.eq((select count(*) from public.unplanned_items where month = '2026-07-01')::text, '0', 'July unplanned removed');
+select test.eq(public.get_actuals()#>>'{checkins,0,month}', '2026-08', 'August is untouched');
+select test.eq((select count(*) from public.audit_events where summary like 'Cleared Jul 2026%')::text, '1', 'one History line for the clear');
+select test.eq((select count(*) from public.audit_events where event_type = 'delete' and entity in ('actual_entries', 'unplanned_items'))::text, '0',
+               'no History line per deleted row');
+select test.throws($$select public.clear_month('2026-07')$$, '%nothing to clear%', 'clearing an empty month is rejected');
+select test.throws($$select public.clear_month('2026-7')$$, '%not a valid month%', 'bad month rejected');
+-- unplanned item id from earlier is gone with July; re-add one for the isolation checks below
+select public.add_unplanned('2026-08', 'expense', 'Car repair', '4500', 'radiator') as unp_id \gset
+
 \echo '--- isolation'
 select test.act_as(:'tok_e');
 select test.eq(public.get_actuals()::text, '{"entries": [], "checkins": [], "unplanned": []}', 'E sees none of D''s actuals');
@@ -73,6 +89,7 @@ select test.throws(format('select public.delete_unplanned(%s)', :'unp_id'), '%no
 select public.save_plan_version(jsonb_set(test.base_plan(), '{items}', '[]'));
 select test.throws($$select public.save_checkin('2026-07', '[{"item_key": "11111111-1111-4111-8111-111111111111", "amount": "1"}]')$$,
                    '%not in your plan%', 'E cannot log against D''s line keys');
+select test.throws($$select public.clear_month('2026-08')$$, '%nothing to clear%', 'E cannot clear D''s month');
 
 select test.act_as(:'tok_d');
 select public.delete_unplanned(:'unp_id');

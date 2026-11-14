@@ -14,7 +14,7 @@ import {
 import { isGoldLine, type VersionInfo } from "../lib/store.ts";
 import type { Ctx } from "./context.ts";
 import { renderImport } from "./importScreen.ts";
-import { LOG_BASE, planReturn, renderLog } from "./log.ts";
+import { LOG_BASE, openClearMonth, planReturn, renderLog } from "./log.ts";
 
 // ---------------------------------------------------------------------------
 //  View: two tabs over the same grid. "Plan" shows the expected numbers only.
@@ -242,6 +242,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
             <span><span class="dot-status pending"></span>Not logged yet</span>
             <span class="muted desktop-only">Empty months are not logged yet. Hover a cell to see the plan.</span>
           </div>`}
+      ${tab === "actual" && (ctx.data.checkins.length || ctx.data.unplanned.length) ? `<button type="button" class="btn ghost small danger-text clear-month-open" id="clear-month">Clear a month…</button>` : ""}
     </div>
 
     <div class="grid-wrap desktop-only" role="region" aria-label="${tab === "plan" ? "Plan by month" : "Actual by month"}" tabindex="0">
@@ -319,6 +320,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
     }
   });
   root.querySelector("#delete-plan")?.addEventListener("click", () => confirmDeletePlan(ctx));
+  root.querySelector("#clear-month")?.addEventListener("click", () => openClearMonth(ctx));
 
   root.querySelector<HTMLSelectElement>("#version")!.addEventListener("change", (e) => {
     selectedVersionNo = Number((e.target as HTMLSelectElement).value);

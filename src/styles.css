@@ -553,3 +553,8 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
 .mp-foot { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 .mp-link { border: 0; background: transparent; color: var(--accent); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
 .mp-link:hover:not([disabled]) { background: var(--surface-2); }
+
+.plan-tabs .clear-month-open { margin-left: auto; }
+.clear-month-btn { display: block; margin: 10px auto 0; }
+.clear-list { margin: 4px 0 12px; padding-left: 20px; }
+.clear-list li { margin: 2px 0; }

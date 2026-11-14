@@ -100,6 +100,7 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
         <label>Note<input name="note" maxlength="500" value="${esc(checkin?.note ?? "")}"></label>
         <div class="totals" id="totals"></div>
         <div class="sticky-save"><button class="btn primary block" type="submit">${checkin ? "Update check-in" : "Save check-in"}</button></div>
+        ${checkin ? `<button type="button" class="btn ghost small danger-text clear-month-btn" data-clear-month="${esc(month)}">Clear ${esc(monthLabel(month, true))}…</button>` : ""}
       </form>
 
       <section class="card">
@@ -201,6 +202,7 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
   root.querySelector<HTMLSelectElement>("#month")!.addEventListener("change", (e) => ctx.navigate(`${LOG_BASE}${(e.target as HTMLSelectElement).value}`));
   root.querySelectorAll<HTMLButtonElement>("[data-go]").forEach((b) => b.addEventListener("click", () => ctx.navigate(`${LOG_BASE}${b.dataset.go}`)));
   root.querySelectorAll<HTMLButtonElement>("[data-add-unplanned]").forEach((b) => b.addEventListener("click", () => addUnplanned(ctx, month)));
+  root.querySelector<HTMLButtonElement>("[data-clear-month]")?.addEventListener("click", () => openClearMonth(ctx, month));
   root.querySelectorAll<HTMLButtonElement>("[data-del-unplanned]").forEach((b) => b.addEventListener("click", async () => {
     if (!confirm("Delete this item?")) return;
     b.disabled = true;
@@ -269,4 +271,62 @@ function comparisonSummary(ctx: Ctx, month: Month): string {
       <strong class="num ${gap.round(0).isNegative() ? "neg" : gap.round(0).isZero() ? "" : "pos"}">(${gap.round(0).isZero() ? "on plan" : signed(gap)})</strong></span>
     ${c.biggestCause ? `<span class="muted">Biggest cause: ${esc(c.biggestCause.name)} ${signed(c.biggestCause.netEffect)}</span>` : ""}
   </div>`;
+}
+
+/**
+ * Asks which logged month to clear (or confirms `preset`), then removes its logged amounts,
+ * unplanned items and check-in. The plan itself is not changed.
+ */
+export function openClearMonth(ctx: Ctx, preset?: string): void {
+  const months = ctx.data.checkins.map((c) => c.month)
+    .concat(ctx.data.unplanned.map((u) => u.month))
+    .filter((m, i, all) => all.indexOf(m) === i)
+    .sort().reverse();
+  if (!months.length) return void toast("No month is logged yet.", "info");
+  const first = preset && months.includes(preset) ? preset : months[0]!;
+  const what = (m: string) => {
+    const lines = ctx.data.entries.get(m)?.size ?? 0;
+    const unp = ctx.data.unplanned.filter((u) => u.month === m).length;
+    const c = ctx.data.checkins.find((x) => x.month === m);
+    const items = [
+      `${lines} logged amount${lines === 1 ? "" : "s"}`,
+      ...(unp ? [`${unp} unplanned item${unp === 1 ? "" : "s"}`] : []),
+      ...(c?.savingsBalance ? ["the bank balance you entered"] : []),
+      ...(c?.note ? ["the note"] : []),
+      ...(ctx.data.goldByMonth.has(m) ? ["the gold value saved that month"] : []),
+    ];
+    return `<ul class="clear-list">${items.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>`;
+  };
+  openDialog(`
+    <form id="clear-form" novalidate>
+      <h2>${preset ? `Clear ${esc(monthLabel(first, true))}?` : "Clear a month"}</h2>
+      ${preset ? `<input type="hidden" name="month" value="${esc(first)}">` : `
+      <label>Month<select name="month">${months.map((m) => `<option value="${esc(m)}"${m === first ? " selected" : ""}>${esc(monthLabel(m, true))}</option>`).join("")}</select></label>`}
+      <p>This removes:</p>
+      <div id="clear-what">${what(first)}</div>
+      <p class="muted small">Your plan isn't changed. The month goes back to "not logged" and you can log it again any time. This can't be undone.</p>
+      <p class="form-error" hidden></p>
+      <div class="dialog-actions"><button type="button" class="btn ghost" data-close>Cancel</button><button type="submit" class="btn danger">Clear month</button></div>
+    </form>`, (dialog) => {
+    const form = dialog.querySelector<HTMLFormElement>("#clear-form")!;
+    const sel = form.querySelector<HTMLSelectElement>("select[name=month]");
+    sel?.addEventListener("change", () => { form.querySelector("#clear-what")!.innerHTML = what(sel.value); });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const m = (form.elements.namedItem("month") as HTMLInputElement | HTMLSelectElement).value;
+      await busy(form, async () => {
+        try {
+          await ctx.api.rpc("clear_month", { p_month: m });
+          dialog.close();
+          planReturn.tab = "actual";
+          await ctx.reload();
+          if (location.hash.startsWith(LOG_BASE)) ctx.navigate("#/plan/actual");
+          toast(`${monthLabel(m, true)} cleared.`, "ok");
+        } catch (err) {
+          if (err instanceof ApiError && err.kind === "auth") { dialog.close(); ctx.fail(err); }
+          else formError(form, err instanceof ApiError ? err.message : "Could not clear the month.");
+        }
+      });
+    });
+  });
 }
