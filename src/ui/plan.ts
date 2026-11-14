@@ -203,15 +203,21 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
     return `<th scope="col" class="num${m === now ? " current" : ""}"><a class="month-link" href="${LOG_BASE}${m}" title="${esc(what)}" aria-label="${esc(what)}">${dot}${label}</a></th>`;
   };
 
+  const today = currentMonth();
+  const rateNow = [...v.rates].sort((a, b) => (a.from < b.from ? -1 : 1)).filter((r) => r.from <= today).at(-1) ?? v.rates[0];
   root.innerHTML = `
     <div class="page-head">
       <div>
         <h1>Plan</h1>
-        <p class="muted small">${esc(monthLabel(v.start, true))} – ${esc(monthLabel(planEnd(v), true))} · opening ${money(v.openingBalance)} EGP</p>
+        <div class="plan-meta">
+          <span class="meta-chip"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>${esc(monthLabel(v.start, true))} – ${esc(monthLabel(planEnd(v), true))}<span class="muted">· ${v.horizonMonths} months</span></span>
+          <span class="meta-chip"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="7.5" width="16" height="11.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="13.25" r="1.3" fill="currentColor"/></svg><span class="muted">Opening</span> ${money(v.openingBalance)} EGP</span>
+          ${rateNow ? `<span class="meta-chip"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="7.5" cy="7.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16.5" cy="16.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span class="muted">Interest</span> ${esc(Dec.of(rateNow.annualRatePct).toString())}% a year</span>` : ""}
+        </div>
       </div>
       <div class="head-actions">
-        <label class="sr-only" for="version">Plan version</label>
-        <select id="version">${versions.map((x) => `<option value="${x.version.versionNo}"${x === info ? " selected" : ""}>${esc(versionLabel(x))}</option>`).join("")}</select>
+        <label class="version-pick"><span>Version</span>
+          <select id="version">${versions.map((x) => `<option value="${x.version.versionNo}"${x === info ? " selected" : ""}>${esc(versionLabel(x))}</option>`).join("")}</select></label>
         ${target ? `<a class="btn ${logged.has(target) ? "ghost" : "primary"}" href="${LOG_BASE}${target}">${logged.has(target) ? "Edit" : "Log"} ${esc(monthLabel(target, true))}</a>` : ""}
         <a class="btn ghost" href="#/plan/edit">Edit plan</a>
         <details class="menu">
@@ -230,11 +236,11 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
     ${info !== versions[0] ? `<p class="notice">You are looking at an older version. Months from ${esc(monthLabel(v.effectiveFrom, true))} were compared with it until a newer version took over.</p>` : ""}
     <div class="plan-tabs">
       <div class="segmented tabs" role="tablist" aria-label="Plan or actual">
-        <a role="tab" href="#/plan" class="${tab === "plan" ? "on" : ""}" aria-selected="${tab === "plan"}">Plan</a>
-        <a role="tab" href="#/plan/actual" class="${tab === "actual" ? "on" : ""}" aria-selected="${tab === "actual"}">Actual</a>
+        <a role="tab" href="#/plan" class="${tab === "plan" ? "on" : ""}" aria-selected="${tab === "plan"}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 9.5h17M9.5 9.5v10" stroke="currentColor" stroke-width="1.8"/></svg>Plan</a>
+        <a role="tab" href="#/plan/actual" class="${tab === "actual" ? "on" : ""}" aria-selected="${tab === "actual"}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m8.5 12.2 2.4 2.4 4.6-4.9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Actual</a>
       </div>
       ${tab === "plan"
-        ? `<p class="muted small">What you expect each month. Switch to Actual to see what really happened.</p>`
+        ? `<p class="tab-hint">What you expect each month. Switch to <a href="#/plan/actual">Actual</a> to see what really happened.</p>`
         : `<div class="legend" aria-label="What the dots mean">
             <span><span class="dot-status good"></span>On plan or better</span>
             <span><span class="dot-status warn"></span>Slightly behind (≤ ${pctText}%) <a class="small" href="#/settings" title="Change this limit in Settings">change</a></span>

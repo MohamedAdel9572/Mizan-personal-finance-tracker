@@ -592,3 +592,18 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
   .gold-top { grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr); }
   .gold-stats { grid-template-columns: 1fr; }
 }
+
+/* ---------- plan header ---------- */
+.plan-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.meta-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: .8rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.meta-chip svg { color: var(--accent); flex: none; }
+.meta-chip .muted { font-weight: 500; }
+.version-pick { position: relative; display: inline-flex; align-items: center; margin: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding-left: 12px; min-height: 44px; }
+.version-pick > span { font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding-right: 8px; border-right: 1px solid var(--border); }
+.version-pick select { border: 0; background: transparent; min-height: 42px; padding: 0 12px 0 10px; font-weight: 600; box-shadow: none; }
+.version-pick:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.version-pick select:focus { outline: none; box-shadow: none; }
+.tabs a { gap: 7px; grid-auto-flow: column; }
+.tabs a svg { opacity: .8; }
+.tab-hint { margin: 0; font-size: .85rem; color: var(--muted); }
+.tab-hint a { font-weight: 600; }
