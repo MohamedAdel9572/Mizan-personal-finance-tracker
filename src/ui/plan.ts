@@ -14,12 +14,12 @@ import {
 import type { VersionInfo } from "../lib/store.ts";
 import type { Ctx } from "./context.ts";
 import { renderImport } from "./importScreen.ts";
-import { LOG_BASE, renderLog } from "./log.ts";
+import { LOG_BASE, planReturn, renderLog } from "./log.ts";
 
 // ---------------------------------------------------------------------------
-//  View: the plan grid with actuals on top. Each cell shows the PLANNED value;
-//  logged months get a status dot, and hovering (or tapping) a cell shows the
-//  actual. Clicking a month opens the log panel for that month.
+//  View: two tabs over the same grid. "Plan" shows the expected numbers only.
+//  "Actual" shows logged months with a status dot (hover shows the plan) and
+//  leaves unlogged months empty. Clicking a month opens the log panel.
 // ---------------------------------------------------------------------------
 
 type Status = "good" | "warn" | "bad";
@@ -40,6 +40,8 @@ interface GridRow {
   values: (r: PlanMonth) => Dec;
   /** actual for a logged month, or null when there is nothing to compare */
   actual?: (month: Month) => Actual | null;
+  /** value shown on the Actual tab for rows without a plan comparison (assets) */
+  logged?: (month: Month) => Dec | null;
 }
 
 function gridRows(v: PlanVersion, ctx: Ctx): { section: string; rows: GridRow[] }[] {
@@ -56,7 +58,8 @@ function gridRows(v: PlanVersion, ctx: Ctx): { section: string; rows: GridRow[] 
     return { planned: t.planned, actual: t.actual, effect: higherIsBetter ? t.gap : t.gap.neg(), unit };
   };
   const line = (key: string, name: string, withActual: boolean): GridRow => ({
-    label: name, cls: "line", values: (r) => r.lines.get(key) ?? Dec.ZERO, ...(withActual ? { actual: lineActual(key) } : {}),
+    label: name, cls: "line", values: (r) => r.lines.get(key) ?? Dec.ZERO,
+    ...(withActual ? { actual: lineActual(key) } : { logged: (m: Month) => (cmp.has(m) ? act.get(m)?.lines.get(key) ?? null : null) }),
   });
   const of = (kind: string) => v.items.filter((i) => i.kind === kind).map((i) => line(i.key, i.name, kind !== "asset"));
   const unplanned = (kind: "income" | "expense"): GridRow[] => {
@@ -115,6 +118,22 @@ function cell(d: Dec, signedCls: boolean, month: Month, actual: Actual | null): 
     + `<span class="dot-status ${st}" aria-hidden="true"></span>${text}<span class="sr-only">, ${esc(STATUS_WORD[st])}, actual ${money(actual.actual)}</span></td>`;
 }
 
+function actualCell(row: GridRow, month: Month, signedCls: boolean, isLogged: boolean): string {
+  const a = row.actual ? row.actual(month) : null;
+  const plain = !a && row.logged ? row.logged(month) : null;
+  const d = a ? a.actual : plain;
+  if (!d) return isLogged ? `<td class="num zero">–</td>` : `<td class="num blank"></td>`;
+  const neg = d.round(0).isNegative();
+  const zero = d.round(0).isZero();
+  const text = zero ? "–" : money(d);
+  const cls = `num${neg && signedCls ? " neg" : ""}${zero ? " zero" : ""}`;
+  if (!a) return `<td class="${cls}">${text}</td>`;
+  const st = statusOf(a.effect, a.planned);
+  const tip = `${monthLabel(month, true)} · ${STATUS_WORD[st]}\nActual ${money(a.actual)} · Planned ${money(a.planned)}\n${gapWords(a)}`;
+  return `<td class="${cls} has-actual" tabindex="0" data-tip="${esc(tip)}"><span class="dot-status ${st}" aria-hidden="true"></span>${text}`
+    + `<span class="sr-only">, ${esc(STATUS_WORD[st])}, planned ${money(a.planned)}</span></td>`;
+}
+
 let selectedVersionNo: number | null = null;
 let mobileMonthIndex = -1;
 
@@ -145,6 +164,9 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
     return;
   }
 
+  // #/plan = what you expect (plan only), #/plan/actual = what really happened
+  const tab: "plan" | "actual" = ctx.params[0] === "actual" ? "actual" : ctx.params[0] === "log" ? planReturn.tab : "plan";
+  planReturn.tab = tab;
   const info = versions.find((v) => v.version.versionNo === selectedVersionNo) ?? versions[0]!;
   const v = info.version;
   const rows = projectPlan(v);
@@ -161,7 +183,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
 
   const monthHead = (m: Month) => {
     const c = logged.get(m);
-    const dot = c ? `<span class="dot-status ${c.onPlan ? "good" : "bad"}" aria-hidden="true"></span>` : canLog(m) ? `<span class="dot-status pending" aria-hidden="true"></span>` : "";
+    const dot = tab === "plan" ? "" : c ? `<span class="dot-status ${c.onPlan ? "good" : "bad"}" aria-hidden="true"></span>` : canLog(m) ? `<span class="dot-status pending" aria-hidden="true"></span>` : "";
     const label = esc(monthLabel(m));
     if (!canLog(m)) return `<th scope="col" class="num${m === now ? " current" : ""}">${label}</th>`;
     const what = c ? `${monthLabel(m, true)}: ${c.onPlan ? "on plan" : "behind plan"}. Open to see or edit the actuals` : `Log ${monthLabel(m, true)}`;
@@ -177,7 +199,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
       <div class="head-actions">
         <label class="sr-only" for="version">Plan version</label>
         <select id="version">${versions.map((x) => `<option value="${x.version.versionNo}"${x === info ? " selected" : ""}>${esc(versionLabel(x))}</option>`).join("")}</select>
-        ${target ? `<a class="btn primary" href="${LOG_BASE}${target}">Log ${esc(monthLabel(target, true))}</a>` : ""}
+        ${target ? `<a class="btn ${logged.has(target) ? "ghost" : "primary"}" href="${LOG_BASE}${target}">${logged.has(target) ? "Edit" : "Log"} ${esc(monthLabel(target, true))}</a>` : ""}
         <a class="btn ghost" href="#/plan/edit">Edit plan</a>
         <details class="menu">
           <summary class="icon-btn" aria-label="More plan actions" title="More">⋯</summary>
@@ -193,22 +215,31 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
       </div>
     </div>
     ${info !== versions[0] ? `<p class="notice">You are looking at an older version. Months from ${esc(monthLabel(v.effectiveFrom, true))} were compared with it until a newer version took over.</p>` : ""}
-    <div class="legend" aria-label="What the dots mean">
-      <span><span class="dot-status good"></span>On plan or better</span>
-      <span><span class="dot-status warn"></span>Slightly behind (≤ 5%)</span>
-      <span><span class="dot-status bad"></span>Behind plan</span>
-      <span><span class="dot-status pending"></span>Not logged yet</span>
-      <span class="muted"><span class="desktop-only">Numbers are the plan. Hover a cell to see the actual; click a month to log it.</span><span class="mobile-only">Numbers are the plan; the actual is shown under each line.</span></span>
+    <div class="plan-tabs">
+      <div class="segmented tabs" role="tablist" aria-label="Plan or actual">
+        <a role="tab" href="#/plan" class="${tab === "plan" ? "on" : ""}" aria-selected="${tab === "plan"}">Plan</a>
+        <a role="tab" href="#/plan/actual" class="${tab === "actual" ? "on" : ""}" aria-selected="${tab === "actual"}">Actual</a>
+      </div>
+      ${tab === "plan"
+        ? `<p class="muted small">What you expect each month. Switch to Actual to see what really happened.</p>`
+        : `<div class="legend" aria-label="What the dots mean">
+            <span><span class="dot-status good"></span>On plan or better</span>
+            <span><span class="dot-status warn"></span>Slightly behind (≤ 5%)</span>
+            <span><span class="dot-status bad"></span>Behind plan</span>
+            <span><span class="dot-status pending"></span>Not logged yet</span>
+            <span class="muted desktop-only">Empty months are not logged yet. Hover a cell to see the plan.</span>
+          </div>`}
     </div>
 
-    <div class="grid-wrap desktop-only" role="region" aria-label="Plan by month with actuals" tabindex="0">
+    <div class="grid-wrap desktop-only" role="region" aria-label="${tab === "plan" ? "Plan by month" : "Actual by month"}" tabindex="0">
       <table class="grid">
         <thead><tr><th class="sticky-col" scope="col">Line</th>${rows.map((r) => monthHead(r.month)).join("")}</tr></thead>
         <tbody>
           ${groups.map((g) => `
             <tr class="section"><th class="sticky-col" scope="rowgroup" colspan="1">${esc(g.section)}</th><td colspan="${rows.length}"></td></tr>
             ${g.rows.map((row) => `<tr class="${row.cls}"><th class="sticky-col" scope="row">${esc(row.label)}</th>${rows.map((r) =>
-              cell(row.values(r), row.cls.includes("signed") || row.cls === "grand", r.month, row.actual ? row.actual(r.month) : null)).join("")}</tr>`).join("")}
+              tab === "plan" ? cell(row.values(r), row.cls.includes("signed") || row.cls === "grand", r.month, null)
+                : actualCell(row, r.month, row.cls.includes("signed") || row.cls === "grand", logged.has(r.month))).join("")}</tr>`).join("")}
           `).join("")}
         </tbody>
       </table>
@@ -217,24 +248,25 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
     <section class="month-view mobile-only" aria-label="Plan for one month">
       <div class="month-nav">
         <button class="icon-btn" data-step="-1" aria-label="Previous month">‹</button>
-        <div class="month-title"><strong>${logged.get(mm.month) ? `<span class="dot-status ${logged.get(mm.month)!.onPlan ? "good" : "bad"}"></span>` : ""}${esc(monthLabel(mm.month, true))}</strong><span class="muted small">${mobileMonthIndex + 1} of ${rows.length}</span></div>
+        <div class="month-title"><strong>${tab === "actual" && logged.get(mm.month) ? `<span class="dot-status ${logged.get(mm.month)!.onPlan ? "good" : "bad"}"></span>` : ""}${esc(monthLabel(mm.month, true))}</strong><span class="muted small">${mobileMonthIndex + 1} of ${rows.length}</span></div>
         <button class="icon-btn" data-step="1" aria-label="Next month">›</button>
       </div>
       ${canLog(mm.month) ? `<a class="btn ${logged.has(mm.month) ? "ghost" : "primary"} block" href="${LOG_BASE}${mm.month}">${logged.has(mm.month) ? "Edit" : "Log"} ${esc(monthLabel(mm.month, true))}</a>` : ""}
-      <div class="swipe">${groups.map((g) => `
+      ${tab === "actual" && !logged.has(mm.month) ? `<p class="muted center">Not logged yet.</p>` : `<div class="swipe">${groups.map((g) => `
         <div class="card list-card">
           <h3>${esc(g.section)}</h3>
           ${g.rows.map((row) => {
-            const d = row.values(mm);
             const a = row.actual ? row.actual(mm.month) : null;
-            if (row.cls.startsWith("line") && d.isZero() && !a) return "";
+            const d = tab === "plan" ? row.values(mm) : a ? a.actual : row.logged?.(mm.month) ?? null;
+            if (!d) return "";
+            if (row.cls.startsWith("line") && d.isZero()) return "";
             const neg = d.round(0).isNegative();
-            const st = a ? statusOf(a.effect, a.planned) : null;
-            return `<div class="kv ${row.cls}"><span>${esc(row.label)}${a ? `<span class="kv-actual muted small">actual ${money(a.actual)} · ${esc(gapWords(a))}</span>` : ""}</span>
+            const st = tab === "actual" && a ? statusOf(a.effect, a.planned) : null;
+            return `<div class="kv ${row.cls}"><span>${esc(row.label)}${st && a ? `<span class="kv-actual muted small">plan ${money(a.planned)} · ${esc(gapWords(a))}</span>` : ""}</span>
               <span class="num${neg ? " neg" : ""}">${st ? `<span class="dot-status ${st}" aria-label="${esc(STATUS_WORD[st])}"></span>` : ""}${d.round(0).isZero() ? "–" : money(d)}</span></div>`;
           }).join("")}
         </div>`).join("")}
-      </div>
+      </div>`}
     </section>
 `;
 
@@ -286,7 +318,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
     renderPlan(root, ctx);
   };
   root.querySelectorAll<HTMLButtonElement>("[data-step]").forEach((b) => b.addEventListener("click", () => go(Number(b.dataset.step))));
-  const swipe = root.querySelector<HTMLElement>(".swipe")!;
+  const swipe = root.querySelector<HTMLElement>(".month-view")!;
   let x0 = 0;
   swipe.addEventListener("touchstart", (e) => (x0 = e.touches[0]?.clientX ?? 0), { passive: true });
   swipe.addEventListener("touchend", (e) => {
@@ -307,7 +339,7 @@ function openLogPanel(ctx: Ctx, month: string): void {
   });
   // closing by the user (×, Esc, backdrop) goes back to the plan; closing because the route changed doesn't
   dialog.addEventListener("close", () => {
-    if (dialog.dataset.closing !== "route" && location.hash.startsWith(LOG_BASE)) ctx.navigate("#/plan");
+    if (dialog.dataset.closing !== "route" && location.hash.startsWith(LOG_BASE)) ctx.navigate(planReturn.tab === "actual" ? "#/plan/actual" : "#/plan");
   });
 }
 

@@ -114,7 +114,8 @@ Karats 24, 22, 21, 18, 14 and 12 are supported, in the app and in the Excel temp
 template's Gold sheet fetches the same two sources live with `WEBSERVICE` (Excel for Windows)
 and falls back to typed values elsewhere.
 
-**One Plan page.** The plan grid shows planned numbers. A coloured dot on each logged month says
+**One Plan page, two tabs.** "Plan" shows the expected numbers only. "Actual" shows logged months
+with a coloured dot (empty months are not logged yet). The dot says
 how it went (green on plan or better, yellow up to 5% behind, red further behind) and hovering
 or focusing a cell shows the actual. Logging a month opens over the grid (`#/plan/log/<month>`).
 

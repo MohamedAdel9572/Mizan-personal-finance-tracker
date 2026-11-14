@@ -21,6 +21,8 @@ function stashForm(month: Month): void {
 
 /** Where the month log lives: a panel on the Plan page. */
 export const LOG_BASE = "#/plan/log/";
+/** Which Plan tab to go back to when the log panel closes. */
+export const planReturn: { tab: "plan" | "actual" } = { tab: "plan" };
 
 export function renderLog(root: HTMLElement, ctx: Ctx): void {
   const t = ctx.data.timeline;
@@ -177,7 +179,8 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
         });
         await ctx.reload();
         toast(`${monthLabel(month, true)} saved.`, "ok");
-        ctx.navigate("#/plan");
+        planReturn.tab = "actual";
+        ctx.navigate("#/plan/actual");
       } catch (err) {
         if (err instanceof ApiError && err.kind === "auth") ctx.fail(err);
         else formError(form, err instanceof ApiError ? err.message : "Could not save. Please try again.");
