@@ -530,3 +530,24 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
 #plan-colours .dot-status { margin: 0 3px 0 4px; }
 
 .row-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: .68rem; font-weight: 600; letter-spacing: .02em; color: var(--accent); background: var(--accent-soft); vertical-align: middle; cursor: help; }
+
+/* ---------- month calendar (all browsers) ---------- */
+.mp-wrap { position: relative; display: block; }
+.mp-wrap .mp-input { width: 100%; padding-right: 40px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.mp-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.mp-btn:hover { color: var(--text); background: var(--surface-2); }
+.mp-pop { position: fixed; z-index: 1000; width: 264px; padding: 10px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 12px 32px rgba(0,0,0,.28); }
+.mp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.mp-head strong { font-size: 1rem; font-variant-numeric: tabular-nums; }
+.mp-nav { width: 34px; height: 34px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font-size: 1.3rem; line-height: 1; cursor: pointer; }
+.mp-nav:hover:not([disabled]) { background: var(--surface-2); }
+.mp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.mp-month { height: 38px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text); font: inherit; font-size: .9rem; cursor: pointer; }
+.mp-month:hover:not([disabled]) { background: var(--surface-2); }
+.mp-month.today { border-color: var(--accent); }
+.mp-month.on { background: var(--accent); color: var(--accent-text, #fff); font-weight: 700; }
+.mp-month[disabled], .mp-nav[disabled], .mp-link[disabled] { opacity: .35; cursor: not-allowed; }
+.mp-month:focus-visible, .mp-nav:focus-visible, .mp-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mp-foot { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.mp-link { border: 0; background: transparent; color: var(--accent); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+.mp-link:hover:not([disabled]) { background: var(--surface-2); }
