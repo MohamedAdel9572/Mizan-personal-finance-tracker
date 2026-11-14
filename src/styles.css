@@ -416,3 +416,8 @@ select option, select optgroup { background-color: var(--surface); color: var(--
 
 .price-card.needs-price { border-color: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
 .price-card.needs-price input:placeholder-shown { border-color: var(--warn); }
+
+.price-row { grid-template-columns: 1fr minmax(180px, 260px); }
+.price-input { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.price-input label { margin: 0; }
+@media (max-width: 640px) { .price-row { grid-template-columns: 1fr; } }

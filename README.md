@@ -14,7 +14,8 @@ goal tracking and gold holdings. Static Vite + TypeScript PWA on Vercel, Supabas
 | 4 | Dashboard, statistics | |
 | 5 | Excel template download + import (template or your own month-grid sheet) | done early |
 | 5 | Gold screen: your price per gram, value, profit/loss; net worth uses it | done |
-| 5 | Automatic gold price (Edge Function + API), Excel export | next |
+| 5 | Automatic gold price (world price x EGP rate, refreshed in the browser) | done |
+| 5 | Excel export | next |
 | 6 | History timeline + months | done early |
 | 6 | Polish, responsive checks | |
 
@@ -101,6 +102,14 @@ the original Excel (Income / Installments / Assets sections, months across). Eve
 its sheet and row, nothing is saved until you confirm, and `import_workbook()` saves the whole
 file in one transaction. Uploading the same file twice adds no duplicates and creates no new
 plan version.
+
+**Automatic gold price, fetched by the browser.** Free sources with no API key:
+`api.gold-api.com/price/XAU` (USD per ounce) and `open.er-api.com/v6/latest/USD` (EGP rate).
+Price per gram = USD/oz / 31.1034768 x karat/24 x EGP per USD, refreshed every 30 minutes and
+cached in the browser so a failed call still shows the last price with a warning. The spec asked
+for a server-side Edge Function to keep the API key secret; with no key there is nothing to hide,
+so this is simpler and has no server to deploy. Egyptian shop prices are usually within a few
+percent of this; a price you type on the Gold page always wins.
 
 **Writes.** Simple tables (actuals, unplanned items, check-ins, gold holdings, goal) are
 written directly by the browser; RLS, CHECK constraints and triggers validate them.

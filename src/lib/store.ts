@@ -10,6 +10,7 @@ import type { Api } from "./api.ts";
 import { Dec } from "../engine/decimal.ts";
 import { valueHoldings } from "../engine/gold.ts";
 import { effectivePrices, toHoldings, type HoldingRow, type PriceRow } from "./gold.ts";
+import { getGoldFeed, type GoldFeed } from "./goldFeed.ts";
 
 export interface Profile {
   id: string;
@@ -53,6 +54,7 @@ export interface AppData {
   comparisons: MonthComparison[];
   /** gold at today's price, when every karat you own has a price */
   goldValue: Dec | null;
+  goldFeed: GoldFeed | null;
 }
 
 export async function loadProfile(api: Api): Promise<Profile | null> {
@@ -67,6 +69,9 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
     api.rpc<HoldingRow[]>("get_gold_holdings").catch(() => [] as HoldingRow[]),
     api.rpc<PriceRow[]>("get_gold_prices").catch(() => [] as PriceRow[]),
   ]);
+  const owned = goldRows.filter((g) => !g.sold_date);
+  // only ask the internet when there is gold to value
+  const feed: GoldFeed | null = owned.length ? await getGoldFeed().catch(() => null) : null;
 
   const versions: VersionInfo[] = versionRows.map((r) => ({
     id: r.id,
@@ -85,8 +90,7 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
 
   // Gold at today's price replaces the planned gold value in the latest logged month's net worth
   const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date());
-  const owned = goldRows.filter((g) => !g.sold_date);
-  const gold = owned.length ? valueHoldings(toHoldings(owned), effectivePrices(priceRows), "0", todayIso) : null;
+  const gold = owned.length ? valueHoldings(toHoldings(owned), effectivePrices(priceRows, feed), "0", todayIso) : null;
   const goldValue = gold && gold.missingPrices.length === 0 ? gold.market : null;
   const assetValues: Record<string, string> = {};
   const lastChecked = actualRows.checkins.map((c) => c.month).sort().at(-1);
@@ -121,5 +125,6 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
     actuals,
     comparisons,
     goldValue,
+    goldFeed: feed,
   };
 }

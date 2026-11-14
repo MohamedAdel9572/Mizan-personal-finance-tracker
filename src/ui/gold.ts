@@ -2,6 +2,7 @@
 import { Dec } from "../engine/decimal.ts";
 import { valueHoldings, type Karat } from "../engine/gold.ts";
 import { effectivePrices, toHoldings, type HoldingRow, type PriceRow } from "../lib/gold.ts";
+import { getGoldFeed } from "../lib/goldFeed.ts";
 import { ApiError } from "../lib/api.ts";
 import { emptyState, esc, toast } from "../lib/dom.ts";
 import { dateTime, egp, money, signed } from "../lib/format.ts";
@@ -31,7 +32,8 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
       emptyState("No gold yet", "Import your pieces from Excel (Gold sheet). Adding pieces by hand comes in step 5.", { href: "#/plan/import", label: "Import from Excel" });
     return;
   }
-  const eff = effectivePrices(prices);
+  const feed = ctx.data.goldFeed;
+  const eff = effectivePrices(prices, feed);
   const holdings = toHoldings(owned);
   const summary = valueHoldings(holdings, eff, "0", today());
   const byLabel = new Map(summary.holdings.map((h) => [h.holding, h]));
@@ -41,7 +43,7 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
 
   root.innerHTML = `
     <div class="page-head"><div><h1>Gold</h1>
-      <p class="muted small">Value = grams × the price a shop pays you per gram. Automatic daily prices arrive in step 5.</p></div>
+      <p class="muted small">Value = grams × price per gram. The price updates automatically from the internet; you can set your shop's price instead.</p></div>
       <div class="head-actions"><a class="btn ghost" href="#/plan/import">Import from Excel</a></div></div>
 
     <div class="stats-grid">
@@ -54,19 +56,33 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
         <span class="small muted">${priced && !summary.cost.isZero() ? `${summary.profitMarket.div(summary.cost).times(100).toFixed(1)}% on what you paid` : "set a price below"}</span></div>
     </div>
 
-    ${priced ? "" : `<div class="alert warning notice-row" role="status"><span><strong>No price saved for ${summary.missingPrices.map((k) => `${k}K`).join(", ")} yet.</strong> Type today's price per gram below and press Save to see the value and profit of each piece.</span></div>`}
+    ${feed?.stale ? `<div class="alert warning" role="status">Couldn't reach the price service. Showing the last price from ${esc(dateTime(feed.fetchedAt))}.</div>` : ""}
+    ${!feed && !priced ? `<div class="alert warning" role="status"><strong>Couldn't get the gold price from the internet.</strong> Type today's price per gram below, or try Refresh.</div>` : ""}
     <form class="card price-card${priced ? "" : " needs-price"}" id="prices" novalidate>
-      <div class="section-head"><h2>Price per gram</h2></div>
-      <p class="muted small" id="price-hint">Use the shop <strong>buying</strong> price (what a shop pays you), from your gold app or a price board. Example: 21K was 5,900 on 13 Nov 2026.</p>
+      <div class="section-head"><h2>Price per gram</h2>
+        <button type="button" class="btn ghost small" id="refresh-price">Refresh</button></div>
+      <p class="muted small" id="price-hint">${feed
+        ? `Automatic: world gold $${money(feed.spotUsdOz, 2)}/oz × ${esc(Dec.of(feed.usdEgp).toFixed(2))} EGP per USD, updated ${esc(dateTime(feed.goldAt))}. Shops in Egypt are usually within a few percent of this.`
+        : "Automatic price not available right now."}
+        Type your shop's buying price to use it instead.</p>
       <div class="price-rows">
         ${karats.map((k) => {
           const p = prices.find((x) => x.karat === k);
-          const when = p?.my_price && p.my_price_at ? `your price, ${dateTime(p.my_price_at)}` : p?.fetched_at ? `${esc(p.source ?? "fetched")}, ${dateTime(p.fetched_at)}` : "not set";
-          return `<label class="price-row"><span><strong>${k}K</strong><span class="muted small">${when}</span></span>
-            <span class="suffix"><input name="k${k}" inputmode="decimal" value="${esc(p?.my_price ? Dec.of(p.my_price).toString() : "")}" placeholder="${esc(p?.fetched_price ? Dec.of(p.fetched_price).toString() : "Price per gram")}" aria-describedby="price-hint"><span>EGP</span></span></label>`;
+          const auto = feed?.perGram[k];
+          const mine = p?.my_price ? Dec.of(p.my_price) : null;
+          return `<div class="price-row">
+            <span><strong>${k}K</strong>
+              <span class="muted small">${mine ? `Using your price (set ${esc(dateTime(p!.my_price_at!))})` : auto ? `Using automatic: <strong>${money(auto)}</strong> EGP` : "No price"}</span>
+              ${mine && auto ? `<span class="muted small">Automatic now: ${money(auto)} EGP</span>` : ""}</span>
+            <span class="price-input">
+              <label class="suffix"><span class="sr-only">Your ${k}K price per gram</span>
+                <input name="k${k}" inputmode="decimal" value="${esc(mine ? mine.toString() : "")}" placeholder="Your price (optional)" aria-describedby="price-hint"><span>EGP</span></label>
+              ${mine ? `<button type="button" class="btn ghost small" data-auto="${k}">Use automatic</button>` : ""}
+            </span>
+          </div>`;
         }).join("")}
       </div>
-      <button class="btn primary" type="submit">Save prices</button>
+      <button class="btn primary" type="submit">Save my prices</button>
       <p class="form-error" hidden></p>
     </form>
 
@@ -82,6 +98,26 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
           <td class="num" data-label="Bought">${esc(r.purchase_date)}</td></tr>`;
       }).join("")}</tbody>
     </table></div>`;
+
+  root.querySelector("#refresh-price")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = "Refreshing…";
+    const fresh = await getGoldFeed(true);
+    await ctx.reload();
+    toast(fresh && !fresh.stale ? "Gold price updated." : "Couldn't reach the price service.", fresh && !fresh.stale ? "ok" : "error");
+  });
+  root.querySelectorAll<HTMLButtonElement>("[data-auto]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true;
+    try {
+      await ctx.api.rpc("set_gold_price", { p_karat: Number(b.dataset.auto), p_price: "" });
+      await ctx.reload();
+      toast(`${b.dataset.auto}K now uses the automatic price.`, "ok");
+    } catch (ex) {
+      b.disabled = false;
+      ctx.fail(ex);
+    }
+  }));
 
   const form = root.querySelector<HTMLFormElement>("#prices")!;
   form.addEventListener("submit", async (e) => {
@@ -105,7 +141,7 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
     try {
       for (const c of changes) await ctx.api.rpc("set_gold_price", { p_karat: c.karat, p_price: c.price });
       await ctx.reload();
-      toast("Prices saved.", "ok");
+      toast("Your prices saved.", "ok");
     } catch (ex) {
       btn.disabled = false;
       if (ex instanceof ApiError && ex.kind === "auth") return ctx.fail(ex);
