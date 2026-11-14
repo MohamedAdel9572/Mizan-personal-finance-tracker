@@ -558,3 +558,12 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
 .clear-month-btn { display: block; margin: 10px auto 0; }
 .clear-list { margin: 4px 0 12px; padding-left: 20px; }
 .clear-list li { margin: 2px 0; }
+
+/* settings: plan colours chips */
+.pc-caption { margin: 0 0 6px; }
+.pc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.pc-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; border-radius: 999px; font-size: .8rem; font-weight: 600; }
+.pc-chip .dot-status { margin: 0; }
+.pc-chip.good { background: var(--good-soft); }
+.pc-chip.warn { background: var(--warn-soft); }
+.pc-chip.bad { background: var(--bad-soft); }

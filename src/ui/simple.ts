@@ -33,8 +33,12 @@ export function renderSettings(root: HTMLElement, ctx: Ctx, onSignedOut: () => v
       </section>
       <form class="card" id="plan-colours" novalidate>
         <h2>Plan colours</h2>
-        <p class="muted small">On the Actual tab a line is <span class="dot-status good"></span>green when it's on plan or better,
-          <span class="dot-status warn"></span>yellow when it's a little worse, and <span class="dot-status bad"></span>red beyond that.</p>
+        <p class="muted small pc-caption">Dots on the Actual tab:</p>
+        <div class="pc-chips">
+          <span class="pc-chip good"><span class="dot-status good"></span>On plan or better</span>
+          <span class="pc-chip warn"><span class="dot-status warn"></span>A little worse</span>
+          <span class="pc-chip bad"><span class="dot-status bad"></span>Behind plan</span>
+        </div>
         <label>Yellow up to this % worse than the plan
           <span class="suffix"><input name="warn" inputmode="decimal" data-num="pct" maxlength="5" value="${esc(Dec.of(ctx.data.settings.warnPct).toString())}" aria-describedby="warn-hint"><span>%</span></span></label>
         <p class="muted small" id="warn-hint">Example with 5%: Car planned 8,000 and you paid 8,300 (3.75% more) shows yellow; 8,500 (6.25% more) shows red. 0 means anything worse is red.</p>
