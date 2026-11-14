@@ -125,7 +125,41 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
           }).join("")}
         </div>`).join("")}
       </div>
+    </section>
+
+    <section class="card danger-zone manage-plan">
+      <h2>Manage plan</h2>
+      <div class="manage-row">
+        <div><strong>Undo the last change</strong>
+          <p class="muted small">${versions.length > 1
+            ? `Deletes version ${versions[0]!.version.versionNo}. Version ${versions[1]!.version.versionNo} becomes current again. Your logged months are kept.`
+            : "You only have one version, so there is nothing to undo."}</p></div>
+        <button class="btn ghost" id="undo-version" ${versions.length > 1 ? "" : "disabled"}>Delete version ${versions[0]!.version.versionNo}</button>
+      </div>
+      <div class="manage-row">
+        <div><strong>Delete the whole plan</strong>
+          <p class="muted small">Deletes every version, logged month and unplanned item. Your gold pieces are kept. This can't be undone.</p></div>
+        <button class="btn danger" id="delete-plan">Delete plan</button>
+      </div>
     </section>`;
+
+  root.querySelector("#undo-version")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    const [cur, prev] = versions;
+    if (!cur || !prev) return;
+    if (!confirm(`Delete plan version ${cur.version.versionNo}? Version ${prev.version.versionNo} becomes current again.`)) return;
+    btn.disabled = true;
+    try {
+      await ctx.api.rpc("delete_latest_plan_version");
+      selectedVersionNo = null;
+      await ctx.reload();
+      toast(`Version ${cur.version.versionNo} deleted. Version ${prev.version.versionNo} is current.`, "ok");
+    } catch (err) {
+      btn.disabled = false;
+      ctx.fail(err);
+    }
+  });
+  root.querySelector("#delete-plan")?.addEventListener("click", () => confirmDeletePlan(ctx));
 
   root.querySelector<HTMLSelectElement>("#version")!.addEventListener("change", (e) => {
     selectedVersionNo = Number((e.target as HTMLSelectElement).value);
@@ -161,6 +195,53 @@ function choice(href: string, icon: string, title: string, text: string, primary
     <span class="choice-body"><strong>${esc(title)}</strong><span class="muted small">${esc(text)}</span></span>
     <span class="choice-arrow" aria-hidden="true">›</span>
   </a>`;
+}
+
+function confirmDeletePlan(ctx: Ctx): void {
+  const months = ctx.data.checkins.length;
+  const unplanned = ctx.data.unplanned.length;
+  const versions = ctx.data.versions.length;
+  openDialog(`
+    <form id="delete-plan-form" novalidate>
+      <h2>Delete the whole plan?</h2>
+      <p>This permanently deletes:</p>
+      <ul class="tight">
+        <li>${versions} plan ${versions === 1 ? "version" : "versions"}</li>
+        <li>${months} logged ${months === 1 ? "month" : "months"} and their amounts</li>
+        <li>${unplanned} unplanned ${unplanned === 1 ? "item" : "items"}</li>
+      </ul>
+      <p class="muted small">Your gold pieces and your account stay. It can't be undone; download or keep your Excel file if you may need it again.</p>
+      <label>Type <strong>DELETE</strong> to confirm<input name="confirm" autocomplete="off" autocapitalize="characters"></label>
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost" data-close>Cancel</button>
+        <button type="submit" class="btn danger" disabled>Delete plan</button>
+      </div>
+    </form>`, (dialog) => {
+    const form = dialog.querySelector<HTMLFormElement>("#delete-plan-form")!;
+    const input = form.querySelector<HTMLInputElement>("input[name=confirm]")!;
+    const submit = form.querySelector<HTMLButtonElement>("button[type=submit]")!;
+    input.focus();
+    input.addEventListener("input", () => (submit.disabled = input.value.trim().toUpperCase() !== "DELETE"));
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (input.value.trim().toUpperCase() !== "DELETE") return;
+      await busy(form, async () => {
+        try {
+          await ctx.api.rpc("delete_plan");
+          dialog.close();
+          selectedVersionNo = null;
+          discardPlanDraft();
+          await ctx.reload();
+          ctx.navigate("#/plan");
+          toast("Plan deleted.", "ok");
+        } catch (err) {
+          if (err instanceof ApiError && err.kind === "auth") { dialog.close(); ctx.fail(err); }
+          else formError(form, err instanceof ApiError ? err.message : "Could not delete the plan.");
+        }
+      });
+      submit.disabled = input.value.trim().toUpperCase() !== "DELETE";
+    });
+  });
 }
 
 function versionLabel(x: VersionInfo): string {

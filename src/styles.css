@@ -344,3 +344,10 @@ details.card summary { cursor: pointer; min-height: 32px; }
 .detail-actions { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .quick-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
 .auth-switch { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+.manage-plan { margin-top: 24px; max-width: 980px; }
+.manage-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--border); }
+.manage-row:first-of-type { border-top: 0; }
+.manage-row p { margin: 2px 0 0; }
+.manage-row .btn { flex: none; }
+@media (max-width: 640px) { .manage-row { flex-direction: column; align-items: stretch; } }
