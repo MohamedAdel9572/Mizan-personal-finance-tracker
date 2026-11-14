@@ -161,7 +161,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
 
   const monthHead = (m: Month) => {
     const c = logged.get(m);
-    const dot = c ? `<span class="dot-status ${c.onPlan ? "good" : "bad"}" aria-hidden="true"></span>` : canLog(m) ? `<span class="dot-status empty" aria-hidden="true"></span>` : "";
+    const dot = c ? `<span class="dot-status ${c.onPlan ? "good" : "bad"}" aria-hidden="true"></span>` : canLog(m) ? `<span class="dot-status pending" aria-hidden="true"></span>` : "";
     const label = esc(monthLabel(m));
     if (!canLog(m)) return `<th scope="col" class="num${m === now ? " current" : ""}">${label}</th>`;
     const what = c ? `${monthLabel(m, true)}: ${c.onPlan ? "on plan" : "behind plan"}. Open to see or edit the actuals` : `Log ${monthLabel(m, true)}`;
@@ -197,6 +197,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
       <span><span class="dot-status good"></span>On plan or better</span>
       <span><span class="dot-status warn"></span>Slightly behind (≤ 5%)</span>
       <span><span class="dot-status bad"></span>Behind plan</span>
+      <span><span class="dot-status pending"></span>Not logged yet</span>
       <span class="muted"><span class="desktop-only">Numbers are the plan. Hover a cell to see the actual; click a month to log it.</span><span class="mobile-only">Numbers are the plan; the actual is shown under each line.</span></span>
     </div>
 

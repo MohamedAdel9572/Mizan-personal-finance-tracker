@@ -438,7 +438,7 @@ select option, select optgroup { background-color: var(--surface); color: var(--
 .dot-status.good { background: var(--good); }
 .dot-status.warn { background: var(--warn); }
 .dot-status.bad { background: var(--bad); }
-.dot-status.empty { border: 1.5px solid var(--muted); width: 8px; height: 8px; }
+.dot-status.pending { border: 1.5px solid var(--muted); width: 8px; height: 8px; }
 .grid td.has-actual { cursor: help; }
 .grid td.has-actual:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .grid tr.unplanned th { font-style: italic; }
