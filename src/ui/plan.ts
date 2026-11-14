@@ -245,18 +245,32 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
       ${tab === "actual" && (ctx.data.checkins.length || ctx.data.unplanned.length) ? `<button type="button" class="btn ghost small danger-text clear-month-open" id="clear-month">Clear a month…</button>` : ""}
     </div>
 
-    <div class="grid-wrap desktop-only" role="region" aria-label="${tab === "plan" ? "Plan by month" : "Actual by month"}" tabindex="0">
-      <table class="grid">
-        <thead><tr><th class="sticky-col" scope="col">Line</th>${rows.map((r) => monthHead(r.month)).join("")}</tr></thead>
-        <tbody>
-          ${groups.map((g) => `
-            <tr class="section"><th class="sticky-col" scope="rowgroup" colspan="1">${esc(g.section)}</th><td colspan="${rows.length}"></td></tr>
-            ${g.rows.map((row) => `<tr class="${row.cls}"><th class="sticky-col" scope="row">${esc(row.label)}${row.tag ? ` <span class="row-tag" title="${esc(row.tag.title)}">${esc(row.tag.text)}</span>` : ""}</th>${rows.map((r) =>
-              tab === "plan" ? cell(row.values(r), row.cls.includes("signed") || row.cls === "grand", r.month, null)
-                : actualCell(row, r.month, row.cls.includes("signed") || row.cls === "grand", logged.has(r.month))).join("")}</tr>`).join("")}
-          `).join("")}
-        </tbody>
-      </table>
+    <div class="grid-split desktop-only">
+      <!-- line names: never scroll sideways; visual only (the month table repeats each name for screen readers) -->
+      <div class="grid-names" aria-hidden="true">
+        <table class="grid names">
+          <thead><tr><th>Line</th></tr></thead>
+          <tbody>
+            ${groups.map((g) => `
+              <tr class="section"><th>${esc(g.section)}</th></tr>
+              ${g.rows.map((row) => `<tr class="${row.cls}"><th>${esc(row.label)}${row.tag ? ` <span class="row-tag" title="${esc(row.tag.title)}">${esc(row.tag.text)}</span>` : ""}</th></tr>`).join("")}
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+      <div class="grid-wrap" role="region" aria-label="${tab === "plan" ? "Plan by month" : "Actual by month"}" tabindex="0">
+        <table class="grid values">
+          <thead><tr><th class="sr-only" scope="col">Line</th>${rows.map((r) => monthHead(r.month)).join("")}</tr></thead>
+          <tbody>
+            ${groups.map((g) => `
+              <tr class="section"><th class="sr-only" scope="rowgroup">${esc(g.section)}</th><td colspan="${rows.length}"></td></tr>
+              ${g.rows.map((row) => `<tr class="${row.cls}"><th class="sr-only" scope="row">${esc(row.label)}</th>${rows.map((r) =>
+                tab === "plan" ? cell(row.values(r), row.cls.includes("signed") || row.cls === "grand", r.month, null)
+                  : actualCell(row, r.month, row.cls.includes("signed") || row.cls === "grand", logged.has(r.month))).join("")}</tr>`).join("")}
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <section class="month-view mobile-only" aria-label="Plan for one month">
@@ -302,6 +316,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
   grid?.addEventListener("focusin", (e) => { const el = (e.target as HTMLElement).closest<HTMLElement>("[data-tip]"); if (el) show(el); });
   grid?.addEventListener("focusout", hide);
   grid?.addEventListener("scroll", hide, { passive: true });
+  if (grid) linkGridHalves(root.querySelector<HTMLElement>(".grid-names")!, grid);
 
   root.querySelector("#undo-version")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget as HTMLButtonElement;
@@ -705,3 +720,44 @@ export function planMonthsUntil(ctx: Ctx, to: Month): Month[] {
   return monthRange(t.start, to);
 }
 
+/**
+ * The line names and the months are two tables side by side, so the months scroll sideways
+ * without passing under the names. This keeps the halves together: same row heights, the
+ * same vertical scroll, the wheel works over the names, and a hovered row lights up on both.
+ */
+function linkGridHalves(names: HTMLElement, values: HTMLElement): void {
+  const left = [...names.querySelectorAll<HTMLTableRowElement>("tr")];
+  const right = [...values.querySelectorAll<HTMLTableRowElement>("tr")];
+  const sync = () => {
+    left.forEach((r) => (r.style.height = ""));
+    right.forEach((r) => (r.style.height = ""));
+    left.forEach((l, i) => {
+      const r = right[i];
+      if (!r) return;
+      const h = Math.max(l.getBoundingClientRect().height, r.getBoundingClientRect().height);
+      l.style.height = r.style.height = `${h}px`;
+    });
+    // room for the month table's horizontal scrollbar, so the last rows still line up
+    names.style.paddingBottom = `${values.offsetHeight - values.clientHeight}px`;
+    names.scrollTop = values.scrollTop;
+  };
+  sync();
+  if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => requestAnimationFrame(sync)).observe(values);
+  values.addEventListener("scroll", () => (names.scrollTop = values.scrollTop), { passive: true });
+  names.addEventListener("wheel", (e) => {
+    values.scrollTop += e.deltaY;
+    values.scrollLeft += e.deltaX;
+    e.preventDefault();
+  }, { passive: false });
+  const hover = (i: number | null) => {
+    left.forEach((r, k) => r.classList.toggle("hover", k === i));
+    right.forEach((r, k) => r.classList.toggle("hover", k === i));
+  };
+  for (const side of [left, right]) {
+    side.forEach((r, i) => {
+      if (i === 0) return; // header row
+      r.addEventListener("mouseenter", () => hover(i));
+      r.addEventListener("mouseleave", () => hover(null));
+    });
+  }
+}
