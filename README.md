@@ -8,9 +8,9 @@ goal tracking and gold holdings. Static Vite + TypeScript PWA on Vercel, Supabas
 
 | Step | What | State |
 |---|---|---|
-| 1 | Schema, auth, RLS + SQL tests | done (85 tests) |
-| 2 | Calculation engine + unit tests | done (49 tests) |
-| 3 | Plan, actuals, plan vs actual screens | next |
+| 1 | Schema, auth, RLS + SQL tests | done |
+| 2 | Calculation engine + unit tests | done |
+| 3 | Sign in/up, settings, Plan (grid + editor), Log actuals, Plan vs actual | done |
 | 4 | Dashboard, statistics | |
 | 5 | Gold price Edge Function, Excel import/export | |
 | 6 | History, polish, responsive checks | |
@@ -81,6 +81,15 @@ The `(select ...)` wrapper makes Postgres evaluate it once per query instead of 
 Child tables repeat `user_id` and use a composite foreign key `(parent_id, user_id)`, so a
 row of user A can never hang under a parent of user B, and no policy needs a join.
 
+**No supabase-js.** The app only calls Postgres functions through PostgREST with its own
+session header; supabase-js's auth layer would go unused. `src/lib/api.ts` is a small typed
+`fetch` wrapper with timeouts and friendly error messages, and the app has no runtime
+dependencies at all.
+
+**Reads and actuals go through RPCs** (`get_plan_versions`, `get_actuals`, `save_checkin`,
+`add_unplanned`, `delete_unplanned`) so money always arrives as exact text and a whole month's
+check-in is saved in one transaction.
+
 **Writes.** Simple tables (actuals, unplanned items, check-ins, gold holdings, goal) are
 written directly by the browser; RLS, CHECK constraints and triggers validate them.
 Plans are written only through `save_plan_version()`. History (`audit_events`) is written
@@ -98,9 +107,10 @@ sends numeric as a JSON number and JavaScript would make it a float. The engine 
 small BigInt decimal (10 internal places, rounds to 2 only for display).
 
 **Calculation rules** follow your sheet literally:
-first month has no interest; interest is `previous balance x rate / 12` and is negative
-when the balance is negative (that's what the Excel formula does; a real bank would charge
-a different rate, flag me if you want it different).
+first month has no interest; interest is `previous balance x rate / 12`. One deliberate
+difference from Excel: no interest while the balance is zero or negative (a savings account
+doesn't charge its savings rate on an overdraft). Your seed plan never goes negative, so the
+numbers still match the sheet.
 
 **Actuals.** A month counts once it has a check-in. Inside a checked-in month, a planned
 line with no entry counts as 0 (the Log screen will pre-fill planned amounts). Months

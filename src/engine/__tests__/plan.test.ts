@@ -67,7 +67,7 @@ describe("projectPlan: formulas", () => {
       .toEqual(["28000", "28000", "35000", "35000"]);
   });
 
-  it("handles negative months, including negative interest on a negative balance (same as the Excel formula)", () => {
+  it("handles negative months; no interest while the balance is negative", () => {
     const rows = projectPlan(plan({
       openingBalance: "0",
       horizonMonths: 2,
@@ -78,8 +78,20 @@ describe("projectPlan: formulas", () => {
     }));
     expect(rows[0]!.net.toString()).toBe("-500");
     expect(rows[0]!.balance.toString()).toBe("-500");
-    expect(rows[1]!.interest.toString()).toBe("-5");
-    expect(rows[1]!.balance.toString()).toBe("-1005");
+    expect(rows[1]!.interest.toString()).toBe("0");
+    expect(rows[1]!.balance.toString()).toBe("-1000");
+  });
+
+  it("starts earning interest again once the balance is back above zero", () => {
+    const rows = projectPlan(plan({
+      openingBalance: "0",
+      horizonMonths: 3,
+      items: [{ key: "x", kind: "income", name: "X", recurrence: "one_off", start: "2026-01", end: "2026-02",
+                amounts: [{ month: "2026-02", amount: "1500" }] },
+              { key: "e", kind: "expense", name: "E", recurrence: "recurring", start: "2026-01", end: "2026-01",
+                amounts: [{ month: "2026-01", amount: "500" }] }],
+    }));
+    expect(rows.map((r) => r.balance.toString())).toEqual(["-500", "1000", "1010"]);
   });
 
   it("keeps assets out of net but in net worth", () => {

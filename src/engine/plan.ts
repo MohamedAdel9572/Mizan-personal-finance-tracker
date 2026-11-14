@@ -35,8 +35,13 @@ export function rateAt(version: PlanVersion, m: Month): Dec {
   return rate;
 }
 
-/** Interest(m) = Balance(m-1) x annualRate / 12  (rate given in percent) */
+/**
+ * Interest(m) = Balance(m-1) x annualRate / 12  (rate given in percent).
+ * Zero when the previous balance is zero or negative: a savings account doesn't
+ * charge its savings rate on an overdraft, so the plain formula would invent a cost.
+ */
 export function monthlyInterest(previousBalance: Dec, annualRatePct: Dec): Dec {
+  if (!previousBalance.gt(0)) return Dec.ZERO;
   return previousBalance.times(annualRatePct).div(TWELVE_HUNDRED);
 }
 

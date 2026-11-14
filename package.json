@@ -1,7 +1,7 @@
 {
   "name": "mizan",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
   "engines": {
     "node": ">=22.18"
@@ -14,9 +14,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:sql": "sh supabase/tests/run.sh"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.119.0"
   },
   "devDependencies": {
     "typescript": "^6.0.3",
