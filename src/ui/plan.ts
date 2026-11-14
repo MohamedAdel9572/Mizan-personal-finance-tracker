@@ -215,9 +215,10 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
           ${rateNow ? `<span class="meta-chip"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="7.5" cy="7.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16.5" cy="16.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span class="muted">Interest</span> ${esc(Dec.of(rateNow.annualRatePct).toString())}% a year</span>` : ""}
         </div>
       </div>
-      <div class="head-actions">
+      <div class="head-actions plan-actions">
         <label class="version-pick"><span>Version</span>
           <select id="version">${versions.map((x) => `<option value="${x.version.versionNo}"${x === info ? " selected" : ""}>${esc(versionLabel(x))}</option>`).join("")}</select></label>
+        <div class="plan-buttons">
         ${target ? `<a class="btn ${logged.has(target) ? "ghost" : "primary"}" href="${LOG_BASE}${target}">${logged.has(target) ? "Edit" : "Log"} ${esc(monthLabel(target, true))}</a>` : ""}
         <a class="btn ghost" href="#/plan/edit">Edit plan</a>
         <details class="menu">
@@ -231,6 +232,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
               <strong>Delete plan</strong><span class="muted small">All versions, logged months and unplanned items. Gold is kept.</span></button>
           </div>
         </details>
+        </div>
       </div>
     </div>
     ${info !== versions[0] ? `<p class="notice">You are looking at an older version. Months from ${esc(monthLabel(v.effectiveFrom, true))} were compared with it until a newer version took over.</p>` : ""}

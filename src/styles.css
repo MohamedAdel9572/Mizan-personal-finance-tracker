@@ -607,3 +607,12 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
 .tabs a svg { opacity: .8; }
 .tab-hint { margin: 0; font-size: .85rem; color: var(--muted); }
 .tab-hint a { font-weight: 600; }
+
+/* plan header: version on one row, buttons on the next, both on the right */
+.plan-actions { flex-direction: column; align-items: flex-end; gap: 8px; }
+.plan-buttons { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 899px) {
+  .plan-actions { width: 100%; align-items: stretch; }
+  .plan-actions .version-pick select { flex: 1; min-width: 0; }
+  .plan-buttons { justify-content: flex-start; }
+}
