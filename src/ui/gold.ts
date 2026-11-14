@@ -46,23 +46,24 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
 
     <div class="stats-grid">
       <div class="card stat"><span class="stat-label">Value now</span>
-        <span class="stat-value num">${priced ? egp(summary.market) : "–"}</span>
+        <span class="stat-value num${priced ? "" : " muted"}">${priced ? egp(summary.market) : "Needs price"}</span>
         <span class="small muted">${owned.length} pieces · ${esc(grams.toString())} g</span></div>
       <div class="card stat"><span class="stat-label">Paid</span><span class="stat-value num">${egp(Dec.sum(owned.map((r) => r.purchase_price)))}</span></div>
       <div class="card stat"><span class="stat-label">Profit / loss</span>
-        <span class="stat-value num ${priced ? (summary.profitMarket.isNegative() ? "neg" : "pos") : ""}">${priced ? signed(summary.profitMarket) : "–"}</span>
+        <span class="stat-value num ${priced ? (summary.profitMarket.isNegative() ? "neg" : "pos") : "muted"}">${priced ? signed(summary.profitMarket) : "Needs price"}</span>
         <span class="small muted">${priced && !summary.cost.isZero() ? `${summary.profitMarket.div(summary.cost).times(100).toFixed(1)}% on what you paid` : "set a price below"}</span></div>
     </div>
 
-    <form class="card price-card" id="prices" novalidate>
+    ${priced ? "" : `<div class="alert warning notice-row" role="status"><span><strong>No price saved for ${summary.missingPrices.map((k) => `${k}K`).join(", ")} yet.</strong> Type today's price per gram below and press Save to see the value and profit of each piece.</span></div>`}
+    <form class="card price-card${priced ? "" : " needs-price"}" id="prices" novalidate>
       <div class="section-head"><h2>Price per gram</h2></div>
-      <p class="muted small">Use the shop <strong>buying</strong> price (what a shop pays you), e.g. from your gold app or a price board.</p>
+      <p class="muted small" id="price-hint">Use the shop <strong>buying</strong> price (what a shop pays you), from your gold app or a price board. Example: 21K was 5,900 on 13 Nov 2026.</p>
       <div class="price-rows">
         ${karats.map((k) => {
           const p = prices.find((x) => x.karat === k);
-          const when = p?.my_price_at ? `your price, ${dateTime(p.my_price_at)}` : p?.fetched_at ? `${esc(p.source ?? "fetched")}, ${dateTime(p.fetched_at)}` : "not set";
+          const when = p?.my_price && p.my_price_at ? `your price, ${dateTime(p.my_price_at)}` : p?.fetched_at ? `${esc(p.source ?? "fetched")}, ${dateTime(p.fetched_at)}` : "not set";
           return `<label class="price-row"><span><strong>${k}K</strong><span class="muted small">${when}</span></span>
-            <span class="suffix"><input name="k${k}" inputmode="decimal" value="${esc(p?.my_price ? Dec.of(p.my_price).toString() : "")}" placeholder="${esc(p?.fetched_price ? Dec.of(p.fetched_price).toString() : "e.g. 5900")}"><span>EGP</span></span></label>`;
+            <span class="suffix"><input name="k${k}" inputmode="decimal" value="${esc(p?.my_price ? Dec.of(p.my_price).toString() : "")}" placeholder="${esc(p?.fetched_price ? Dec.of(p.fetched_price).toString() : "Price per gram")}" aria-describedby="price-hint"><span>EGP</span></span></label>`;
         }).join("")}
       </div>
       <button class="btn primary" type="submit">Save prices</button>
@@ -76,8 +77,8 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
         return `<tr><th scope="row">${esc(r.label)}</th><td class="num" data-label="Karat">${r.karat}K</td>
           <td class="num" data-label="Grams">${esc(Dec.of(r.grams).toString())}</td>
           <td class="num" data-label="Paid">${money(r.purchase_price)}</td>
-          <td class="num" data-label="Value">${v ? money(v.market) : "–"}</td>
-          <td class="num ${v ? (v.profitMarket.isNegative() ? "neg" : "pos") : ""}" data-label="Profit">${v ? signed(v.profitMarket) : "–"}</td>
+          <td class="num${v ? "" : " muted"}" data-label="Value">${v ? money(v.market) : "needs price"}</td>
+          <td class="num ${v ? (v.profitMarket.isNegative() ? "neg" : "pos") : "muted"}" data-label="Profit">${v ? signed(v.profitMarket) : "needs price"}</td>
           <td class="num" data-label="Bought">${esc(r.purchase_date)}</td></tr>`;
       }).join("")}</tbody>
     </table></div>`;

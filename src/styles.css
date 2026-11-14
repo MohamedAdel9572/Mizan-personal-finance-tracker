@@ -413,3 +413,6 @@ select option, select optgroup { background-color: var(--surface); color: var(--
 .tl-title { font-weight: 600; overflow-wrap: anywhere; }
 .tl-body details { margin-top: 4px; }
 .tl-body summary { cursor: pointer; color: var(--accent); min-height: 28px; }
+
+.price-card.needs-price { border-color: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
+.price-card.needs-price input:placeholder-shown { border-color: var(--warn); }
