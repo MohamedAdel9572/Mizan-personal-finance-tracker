@@ -305,3 +305,6 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / 45%); }
 .head-actions select { width: auto; max-width: 100%; margin: 0; }
 .fab.raised { bottom: calc(var(--tabbar) + 84px + env(safe-area-inset-bottom)); }
 @media (max-width: 899px) { .head-actions .head-save { display: none; } }
+
+.side-link.logout { width: 100%; border: 0; background: transparent; font: inherit; cursor: pointer; color: var(--muted); text-align: left; }
+.side-link.logout:hover { color: var(--bad); background: var(--bad-soft); }

@@ -21,6 +21,8 @@ export const NAV: NavItem[] = [
   { route: "history", label: "History", mobile: true, icon: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>') },
 ];
 
+const logoutIcon = svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/>');
+
 const settingsIcon = svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>');
 
 export function shellHtml(active: string, userName: string): string {
@@ -32,6 +34,7 @@ export function shellHtml(active: string, userName: string): string {
       <div class="brand"><span class="logo" aria-hidden="true">⚖</span> Mizan</div>
       <nav>${NAV.map((n) => link(n, "side-link")).join("")}</nav>
       <a class="side-link${active === "settings" ? " active" : ""}" href="#/settings">${settingsIcon}<span>${esc(userName)}</span></a>
+      <button type="button" class="side-link logout" data-logout>${logoutIcon}<span>Sign out</span></button>
     </aside>
     <div class="main-col">
       <header class="topbar">
@@ -39,6 +42,7 @@ export function shellHtml(active: string, userName: string): string {
         <div class="topbar-actions">
           <a class="icon-btn${active === "compare" ? " active" : ""}" href="#/compare" aria-label="Plan vs actual">${NAV[3]!.icon}</a>
           <a class="icon-btn${active === "settings" ? " active" : ""}" href="#/settings" aria-label="Settings">${settingsIcon}</a>
+          <button type="button" class="icon-btn" data-logout aria-label="Sign out" title="Sign out">${logoutIcon}</button>
         </div>
       </header>
       <main id="screen" tabindex="-1"></main>

@@ -121,6 +121,20 @@ function start(api: Api): void {
     }
   }
 
+  // Sign out from the sidebar (desktop) or the top bar (phone)
+  app.addEventListener("click", async (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-logout]");
+    if (!btn) return;
+    if (hasUnsavedPlan() && !confirm("You have unsaved plan changes. Sign out and discard them?")) return;
+    btn.disabled = true;
+    try {
+      await api.rpc("app_logout");
+    } catch {
+      // the server may be unreachable; signing out on this device is still correct
+    }
+    signedOut("Signed out.");
+  });
+
   window.addEventListener("hashchange", () => {
     // leaving the plan editor with unsaved changes
     if (lastHash.startsWith("#/plan/edit") && !location.hash.startsWith("#/plan/edit") && hasUnsavedPlan()) {
