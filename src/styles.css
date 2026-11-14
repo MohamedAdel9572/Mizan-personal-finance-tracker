@@ -553,27 +553,3 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
 .mp-foot { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 .mp-link { border: 0; background: transparent; color: var(--accent); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
 .mp-link:hover:not([disabled]) { background: var(--surface-2); }
-
-/* ---------- settings: plan colours ---------- */
-#plan-colours .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.pc-limit .suffix { max-width: 180px; }
-.pc-bar { display: flex; gap: 3px; height: 10px; margin: 14px 0 4px; }
-.pc-seg { border-radius: 999px; transition: flex-grow .2s ease; min-width: 0; }
-.pc-seg.good { flex: 3 1 0; background: var(--good); }
-.pc-seg.warn { flex: 1 1 0; background: var(--warn); }
-.pc-seg.bad { flex: 3 1 0; background: var(--bad); }
-.pc-ticks { display: flex; gap: 3px; height: 18px; font-variant-numeric: tabular-nums; color: var(--muted); }
-.pc-ticks span { text-align: right; white-space: nowrap; transition: flex-grow .2s ease; }
-.pc-ticks .good { flex: 3 1 0; } .pc-ticks .warn { flex: 1 1 0; overflow: visible; } .pc-ticks .bad { flex: 3 1 0; }
-.pc-rules { list-style: none; margin: 10px 0 12px; padding: 0; display: grid; gap: 8px; }
-.pc-rules li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); border-left: 3px solid transparent; }
-.pc-rules li.good { border-left-color: var(--good); }
-.pc-rules li.warn { border-left-color: var(--warn); }
-.pc-rules li.bad { border-left-color: var(--bad); }
-.pc-rules li.off { opacity: .5; }
-.pc-rules li div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.pc-rules li div span { font-size: .82rem; color: var(--muted); }
-.pc-rules .dot-status { width: 12px; height: 12px; margin: 0; }
-.pc-eg { font-size: .82rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pc-rules li.pc-note { display: block; background: var(--warn-soft); border-left-color: var(--warn); }
-@media (max-width: 480px) { .pc-rules li { grid-template-columns: auto 1fr; } .pc-eg { grid-column: 2; } }
