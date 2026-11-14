@@ -219,8 +219,6 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
         <label class="version-pick"><span>Version</span>
           <select id="version">${versions.map((x) => `<option value="${x.version.versionNo}"${x === info ? " selected" : ""}>${esc(versionLabel(x))}</option>`).join("")}</select></label>
         <div class="plan-buttons">
-        ${target ? `<a class="btn ${logged.has(target) ? "ghost" : "primary"}" href="${LOG_BASE}${target}">${logged.has(target) ? "Edit" : "Log"} ${esc(monthLabel(target, true))}</a>` : ""}
-        <a class="btn ghost" href="#/plan/edit">Edit plan</a>
         <details class="menu">
           <summary class="icon-btn" aria-label="More plan actions" title="More">⋯</summary>
           <div class="menu-list" role="menu">
@@ -250,7 +248,11 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
             <span><span class="dot-status pending"></span>Not logged yet</span>
             <span class="muted desktop-only">Empty months are not logged yet. Hover a cell to see the plan.</span>
           </div>`}
-      ${tab === "actual" && (ctx.data.checkins.length || ctx.data.unplanned.length) ? `<button type="button" class="btn ghost small danger-text clear-month-open" id="clear-month">Clear a month…</button>` : ""}
+      <div class="tab-actions">
+        ${tab === "actual" && (ctx.data.checkins.length || ctx.data.unplanned.length) ? `<button type="button" class="btn ghost danger-text" id="clear-month">Clear a month…</button>` : ""}
+        ${target ? `<a class="btn ${logged.has(target) ? "ghost" : "primary"}" href="${LOG_BASE}${target}">${logged.has(target) ? "Edit" : "Log"} ${esc(monthLabel(target, true))}</a>` : ""}
+        <a class="btn ghost" href="#/plan/edit">Edit plan</a>
+      </div>
     </div>
 
     <div class="grid-split desktop-only">

@@ -563,7 +563,6 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
 .mp-link { border: 0; background: transparent; color: var(--accent); font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
 .mp-link:hover:not([disabled]) { background: var(--surface-2); }
 
-.plan-tabs .clear-month-open { margin-left: auto; }
 .clear-month-btn { display: block; margin: 10px auto 0; }
 .clear-list { margin: 4px 0 12px; padding-left: 20px; }
 .clear-list li { margin: 2px 0; }
@@ -608,24 +607,22 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
 .tab-hint { margin: 0; font-size: .85rem; color: var(--muted); }
 .tab-hint a { font-weight: 600; }
 
-/* plan header: version on one row, buttons on the next, both on the right */
-.plan-actions { display: grid; grid-template-columns: max-content; gap: 8px; justify-items: stretch; }
-.plan-actions .version-pick { width: 100%; }
+/* plan header right side: version picker + ⋯ menu */
+.plan-actions { display: flex; flex-direction: row; align-items: center; gap: 8px; }
 .plan-actions .version-pick select { flex: 1; min-width: 0; }
-/* buttons fill the same width as the version box, so both rows share left and right edges */
-.plan-buttons { display: flex; gap: 8px; align-items: stretch; }
-.plan-buttons > .btn { flex: 1 1 0; justify-content: center; text-align: center; white-space: nowrap; }
-.plan-buttons > .menu { flex: none; }
-@media (max-width: 899px) {
-  .plan-actions { width: 100%; grid-template-columns: 1fr; }
-}
+.plan-buttons { display: flex; }
+@media (max-width: 899px) { .plan-actions { width: 100%; } .plan-actions .version-pick { flex: 1; min-width: 0; } }
+/* Log / Edit plan sit on the Plan / Actual row, on the right */
+.tab-actions { display: flex; gap: 8px; align-items: center; margin-left: auto; flex-wrap: wrap; }
+@media (max-width: 899px) { .tab-actions { margin-left: 0; width: 100%; } .tab-actions > .btn { flex: 1 1 auto; justify-content: center; } }
 
-/* left and right of the plan header share two rows: title ↔ version, chips ↔ buttons */
+/* title and version box share one line */
 @media (min-width: 900px) {
-  .plan-head { align-items: stretch; }
-  .plan-head-left { display: grid; grid-template-rows: 44px 44px; row-gap: 8px; align-items: center; }
-  .plan-head-left h1 { margin: 0; line-height: 1.1; }
-  .plan-head-left .plan-meta { margin-top: 0; }
-  .plan-actions { grid-template-rows: 44px 44px; }
-  .plan-buttons > .btn, .plan-buttons .icon-btn { min-height: 44px; }
+  .plan-head { align-items: flex-start; }
+  .plan-head-left h1 { margin: 0; line-height: 44px; }
 }
+/* Actual tab: the legend takes its own line under the tabs, so the buttons stay on the tabs row */
+.plan-tabs > .segmented { order: 1; }
+.plan-tabs > .tab-hint { order: 2; }
+.plan-tabs > .tab-actions { order: 3; }
+.plan-tabs > .legend { order: 4; flex-basis: 100%; }
