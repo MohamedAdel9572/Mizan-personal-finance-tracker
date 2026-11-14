@@ -223,12 +223,13 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / 45%); }
 .auth-card > .muted { text-align: center; margin-top: 4px; }
 
 /* ---------- plan grid ---------- */
-/* names (left) never scroll sideways; months (right) do. See linkGridHalves() in plan.ts */
+/* names (left) never scroll sideways; months (right) do (see linkGridHalves() in plan.ts).
+   No inner vertical scroll: the whole grid shows and the page scrolls, which works on touch screens. */
 .grid-split { display: flex; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
-.grid-names { flex: none; overflow: hidden; max-height: calc(100dvh - 180px); border-right: 1px solid var(--border); background: var(--surface); }
+.grid-names { flex: none; overflow: hidden; border-right: 1px solid var(--border); background: var(--surface); }
 .grid-names .grid { min-width: 180px; }
 .grid-names .grid th { text-align: left; }
-.grid-wrap { flex: 1 1 auto; min-width: 0; overflow: auto; max-height: calc(100dvh - 180px); background: var(--surface); }
+.grid-wrap { flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; background: var(--surface); }
 .grid.values th.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); color: transparent; background: none; }
 .grid { border-collapse: separate; border-spacing: 0; font-size: .85rem; min-width: 100%; }
 .grid th, .grid td { padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
