@@ -4,14 +4,13 @@ import { esc, toast } from "./lib/dom.ts";
 import { getToken, setToken } from "./lib/session.ts";
 import { loadData, loadProfile, type AppData } from "./lib/store.ts";
 import { renderLogin, renderSignup } from "./ui/auth.ts";
-import { renderCompare } from "./ui/compare.ts";
 import type { Ctx } from "./ui/context.ts";
 import { renderGold } from "./ui/gold.ts";
 import { renderHistory } from "./ui/history.ts";
-import { renderLog } from "./ui/log.ts";
 import { discardPlanDraft, hasUnsavedPlan, renderPlan } from "./ui/plan.ts";
 import { loadingHtml, shellHtml } from "./ui/shell.ts";
-import { applyTheme, renderDashboard, renderSettings } from "./ui/simple.ts";
+import { renderDashboard } from "./ui/dashboard.ts";
+import { applyTheme, renderSettings } from "./ui/simple.ts";
 
 const app = document.getElementById("app")!;
 const url = (import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
@@ -22,8 +21,6 @@ applyTheme();
 const SCREENS: Record<string, (root: HTMLElement, ctx: Ctx) => void> = {
   dashboard: renderDashboard,
   plan: renderPlan,
-  log: renderLog,
-  compare: renderCompare,
   gold: renderGold,
   history: renderHistory,
 };
@@ -88,6 +85,14 @@ function start(api: Api): void {
       return renderLogin(app, api, () => void boot());
     }
     if (name === "login" || name === "signup") return navigate("#/dashboard");
+    // Log and Plan vs actual now live on the Plan page
+    if (name === "log") return void location.replace(`#/plan/log/${params[0] ?? ""}`);
+    if (name === "compare") return void location.replace(params[0] ? `#/plan/log/${params[0]}` : "#/plan");
+
+    // a route change closes open panels/dialogs (marked so they don't navigate back)
+    document.querySelectorAll<HTMLDialogElement>("dialog[open]").forEach((d) => { d.dataset.closing = "route"; d.close(); });
+    document.getElementById("grid-tip")?.classList.remove("show");
+    document.getElementById("chart-tip")?.classList.remove("show");
 
     const active = name === "settings" || SCREENS[name] ? name : "dashboard";
     app.innerHTML = shellHtml(active, data.profile.full_name);

@@ -8,6 +8,7 @@ import { Dec } from "../engine/decimal.ts";
 import { isMonth } from "../engine/month.ts";
 import { validateDraft, type Draft, type DraftItem } from "./planDraft.ts";
 import { serialToIso, type Sheet } from "./xlsx.ts";
+import { KARATS, type Karat } from "../engine/gold.ts";
 
 export interface ImportProblem {
   sheet: string;
@@ -17,7 +18,7 @@ export interface ImportProblem {
 
 export interface ImportActual { row: number; month: string; line: string; amount: string; note: string }
 export interface ImportUnplanned { row: number; month: string; kind: "income" | "expense"; name: string; amount: string; note: string }
-export interface ImportGold { row: number; label: string; karat: 24 | 21 | 18; grams: string; price: string; date: string }
+export interface ImportGold { row: number; label: string; karat: Karat; grams: string; price: string; date: string }
 
 export interface ParsedImport {
   draft: Draft | null;
@@ -286,7 +287,12 @@ export function parseImport(sheets: Sheet[], opts: ImportOptions): ParsedImport 
   // ---------- Gold ----------
   const gold = find("Gold");
   if (gold) {
-    for (let r = 11; r <= gold.maxRow; r++) {
+    // Holdings start under the "Label | Karat" header (row 10 in older files, row 13 now).
+    let first = 11;
+    for (let r = 1; r <= Math.min(gold.maxRow, 40); r++) {
+      if (textOf(get(gold, `A${r}`)).toLowerCase() === "label" && textOf(get(gold, `B${r}`)).toLowerCase() === "karat") { first = r + 1; break; }
+    }
+    for (let r = first; r <= gold.maxRow; r++) {
       const label = textOf(get(gold, `A${r}`));
       if (label.toLowerCase() === "total") break;
       if (isEmptyRow(gold, r, "ABCDE")) continue;
@@ -297,12 +303,12 @@ export function parseImport(sheets: Sheet[], opts: ImportOptions): ParsedImport 
       const date = dateOf(get(gold, `E${r}`));
       let ok = true;
       if (!label || label.length > 80) { p("Label is required (max 80 characters)."); ok = false; }
-      if (karat !== 24 && karat !== 21 && karat !== 18) { p(`Karat "${textOf(get(gold, `B${r}`))}" must be 24, 21 or 18.`); ok = false; }
+      if (!(KARATS as readonly number[]).includes(karat)) { p(`Karat "${textOf(get(gold, `B${r}`))}" must be ${KARATS.join(", ")}.`); ok = false; }
       if (grams === null || Dec.of(grams).isZero()) { p("Grams must be more than 0 (max 3 decimals)."); ok = false; }
       if (price === null) { p("Purchase price must be a number of 0 or more."); ok = false; }
       if (!date) { p(`Purchase date "${textOf(get(gold, `E${r}`))}" is not a valid date.`); ok = false; }
       else if (date > opts.today) { p("Purchase date is in the future."); ok = false; }
-      if (ok) out.gold.push({ row: r, label, karat: karat as 24 | 21 | 18, grams: grams!, price: price!, date: date! });
+      if (ok) out.gold.push({ row: r, label, karat: karat as Karat, grams: grams!, price: price!, date: date! });
     }
   }
 

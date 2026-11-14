@@ -7,41 +7,6 @@ import { egp, monthLabel, signed } from "../lib/format.ts";
 import { passwordProblem, setToken } from "../lib/session.ts";
 import type { Ctx } from "./context.ts";
 
-export function renderDashboard(root: HTMLElement, ctx: Ctx): void {
-  const t = ctx.data.timeline;
-  if (!t) {
-    root.innerHTML = `<div class="page-head"><h1>Hi ${esc(ctx.data.profile.full_name.split(" ")[0])}</h1></div>` +
-      emptyState("Let's set up your plan", "Add your income, installments and savings account first.", { href: "#/plan", label: "Create my plan" });
-    return;
-  }
-  const now = currentMonth();
-  const last = ctx.data.comparisons.filter((c) => !c.assumed).at(-1);
-  const lastActual = ctx.data.actuals.filter((a) => !a.assumed).at(-1);
-  const plannedNow = t.planned(now < t.start ? t.start : now);
-  const netWorth = lastActual?.netWorth ?? plannedNow?.netWorth ?? Dec.ZERO;
-  const notLogged = now >= t.start && !ctx.data.checkins.some((c) => c.month === now);
-
-  root.innerHTML = `
-    <div class="page-head"><h1>Hi ${esc(ctx.data.profile.full_name.split(" ")[0])}</h1></div>
-    ${notLogged ? `<div class="alert info notice-row"><span><strong>${esc(monthLabel(now, true))}</strong> isn't logged yet.</span><a class="btn primary small" href="#/log/${now}">Log it</a></div>` : ""}
-    <div class="stats-grid">
-      <div class="card stat"><span class="stat-label">Net worth</span><span class="stat-value num">${egp(netWorth)}</span>
-        <span class="small muted">${lastActual ? `actual, ${esc(monthLabel(lastActual.month, true))}${ctx.data.goldValue ? ", gold at today's price" : ""}` : "planned"}</span></div>
-      ${ctx.data.goldValue ? `<a class="card stat link-card" href="#/gold"><span class="stat-label">Gold now</span><span class="stat-value num">${egp(ctx.data.goldValue)}</span><span class="small muted">${ctx.data.goldFeed && !ctx.data.goldFeed.stale ? "at today's price" : "at the last known price"}</span></a>` : ""}
-      ${last ? `
-      <div class="card stat"><span class="stat-label">Last month vs plan</span><span class="stat-value num ${last.net.gap.isNegative() ? "neg" : "pos"}">${signed(last.net.gap)}</span>
-        <span class="small muted">${esc(monthLabel(last.month, true))} net</span></div>
-      <div class="card stat"><span class="stat-label">Cumulative gap</span><span class="stat-value num ${last.cumulative.net.isNegative() ? "neg" : "pos"}">${signed(last.cumulative.net)}</span>
-        <span class="small muted">since ${esc(monthLabel(t.start, true))}</span></div>` : ""}
-    </div>
-    <div class="quick-actions">
-      <a class="btn ghost" href="#/compare">Plan vs actual</a>
-      <a class="btn ghost" href="#/plan">Plan</a>
-      <a class="btn ghost" href="#/plan/import">Import Excel</a>
-    </div>
-    <p class="muted small">Goal progress, alerts and charts arrive with the full dashboard (step 4).</p>`;
-}
-
 export function renderComingSoon(title: string, text: string): (root: HTMLElement) => void {
   return (root) => {
     root.innerHTML = `<div class="page-head"><h1>${esc(title)}</h1></div>` + emptyState("Coming soon", text);

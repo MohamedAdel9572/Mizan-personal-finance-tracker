@@ -17,15 +17,15 @@ select test.eq((public.get_history()#>>'{0,type}'), 'insert', 'newest entry firs
 select test.eq((select count(*) from jsonb_array_elements(public.get_history()) x where x->>'type' = 'plan_version')::text, '1', 'plan version in history');
 select test.eq(jsonb_array_length(public.get_history(1))::text, '1', 'limit works');
 
-select test.eq(public.get_gold_prices()#>>'{1,karat}', '21', 'karats listed 24, 21, 18');
-select test.eq((public.get_gold_prices()#>'{1,my_price}')::text, 'null', 'no price yet');
+select test.eq((select string_agg(x->>'karat', ',') from jsonb_array_elements(public.get_gold_prices()) x), '24,22,21,18,14,12', 'all karats listed');
+select test.eq((public.get_gold_prices()#>'{2,my_price}')::text, 'null', 'no price yet');
 select public.set_gold_price(21, '5,900'::text);
-select test.eq(public.get_gold_prices()#>>'{1,my_price}', '5900.00', 'price saved (thousand separator accepted)');
+select test.eq(public.get_gold_prices()#>>'{2,my_price}', '5900.00', 'price saved (thousand separator accepted)');
 select public.set_gold_price(21, '5950');
-select test.eq(public.get_gold_prices()#>>'{1,my_price}', '5950.00', 'latest price wins');
+select test.eq(public.get_gold_prices()#>>'{2,my_price}', '5950.00', 'latest price wins');
 select public.set_gold_price(21, '');
-select test.eq((public.get_gold_prices()#>'{1,my_price}')::text, 'null', 'empty clears the price');
-select test.throws($$select public.set_gold_price(22, '1')$$, '%24, 21 or 18%', 'bad karat rejected');
+select test.eq((public.get_gold_prices()#>'{2,my_price}')::text, 'null', 'empty clears the price');
+select test.throws($$select public.set_gold_price(20, '1')$$, '%24, 22, 21, 18, 14 or 12%', 'bad karat rejected');
 select test.throws($$select public.set_gold_price(21, '-5')$$, '%negative%', 'negative price rejected');
 select test.throws($$select public.set_gold_price(21, '0')$$, '%more than 0%', 'zero price rejected');
 select test.eq((select count(*) from jsonb_array_elements(public.get_history()) x where x->>'entity' = 'gold_price_overrides')::text, '3', 'price changes in history');
@@ -33,11 +33,11 @@ select test.eq((select count(*) from jsonb_array_elements(public.get_history()) 
 reset role;
 insert into public.gold_prices (karat, price_per_gram_egp, source) values (21, 5900, 'test-feed');
 set role anon;
-select test.eq(public.get_gold_prices()#>>'{1,fetched_price}', '5900.00', 'fetched price visible');
+select test.eq(public.get_gold_prices()#>>'{2,fetched_price}', '5900.00', 'fetched price visible');
 
 select test.act_as(:'tok_k');
 select test.eq(public.get_history()::text, '[]', 'K sees none of J''s history');
-select test.eq((public.get_gold_prices()#>'{1,my_price}')::text, 'null', 'K does not see J''s price');
+select test.eq((public.get_gold_prices()#>'{2,my_price}')::text, 'null', 'K does not see J''s price');
 
 select public.app_delete_account('password-k1');
 select test.act_as(:'tok_j');

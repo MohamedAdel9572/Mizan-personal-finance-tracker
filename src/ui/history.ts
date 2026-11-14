@@ -130,7 +130,7 @@ function monthsHtml(ctx: Ctx): string {
   return `<div class="card"><table class="table months-history">
     <thead><tr><th>Month</th><th class="num">Planned net</th><th class="num">Actual net</th><th class="num">Gap</th><th class="num">Savings balance</th><th>Result</th></tr></thead>
     <tbody>${months.map((c) => `<tr>
-      <th scope="row"><a href="#/compare/${c.month}">${esc(monthLabel(c.month, true))}</a></th>
+      <th scope="row"><a href="#/plan/log/${c.month}">${esc(monthLabel(c.month, true))}</a></th>
       <td class="num" data-label="Planned net">${money(c.net.planned)}</td>
       <td class="num" data-label="Actual net">${money(c.net.actual)}</td>
       <td class="num ${c.net.gap.round(0).isNegative() ? "neg" : c.net.gap.round(0).isZero() ? "" : "pos"}" data-label="Gap">${c.net.gap.round(0).isZero() ? "–" : signed(c.net.gap)}</td>

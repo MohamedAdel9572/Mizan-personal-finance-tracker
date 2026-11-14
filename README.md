@@ -110,6 +110,17 @@ cached in the browser so a failed call still shows the last price with a warning
 for a server-side Edge Function to keep the API key secret; with no key there is nothing to hide,
 so this is simpler and has no server to deploy. Egyptian shop prices are usually within a few
 percent of this; a price you type on the Gold page always wins.
+Karats 24, 22, 21, 18, 14 and 12 are supported, in the app and in the Excel template. The
+template's Gold sheet fetches the same two sources live with `WEBSERVICE` (Excel for Windows)
+and falls back to typed values elsewhere.
+
+**One Plan page.** The plan grid shows planned numbers. A coloured dot on each logged month says
+how it went (green on plan or better, yellow up to 5% behind, red further behind) and hovering
+or focusing a cell shows the actual. Logging a month opens over the grid (`#/plan/log/<month>`).
+
+**Dashboard.** Headline numbers, goal progress against the plan, alerts, and six charts (net
+worth, savings balance, income vs expenses, savings rate, plan vs actual net, and the gap by
+line). The charts are small hand-written SVG in `src/ui/charts.ts`, no chart library.
 
 **Writes.** Simple tables (actuals, unplanned items, check-ins, gold holdings, goal) are
 written directly by the browser; RLS, CHECK constraints and triggers validate them.

@@ -1,7 +1,10 @@
 import { Dec } from "./decimal.ts";
 import type { Money } from "./types.ts";
 
-export type Karat = 24 | 21 | 18;
+export type Karat = 24 | 22 | 21 | 18 | 14 | 12;
+
+/** Karats sold in Egypt, purest first. */
+export const KARATS: readonly Karat[] = [24, 22, 21, 18, 14, 12];
 
 export interface GoldHolding {
   label: string;

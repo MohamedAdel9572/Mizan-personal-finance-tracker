@@ -1,6 +1,6 @@
 // Gold: holdings, your price per gram, value and profit/loss. Automatic prices arrive with step 5.
 import { Dec } from "../engine/decimal.ts";
-import { valueHoldings, type Karat } from "../engine/gold.ts";
+import { KARATS, valueHoldings, type Karat } from "../engine/gold.ts";
 import { effectivePrices, toHoldings, type HoldingRow, type PriceRow } from "../lib/gold.ts";
 import { getGoldFeed } from "../lib/goldFeed.ts";
 import { ApiError } from "../lib/api.ts";
@@ -42,6 +42,22 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
   const karats = [...new Set(owned.map((r) => r.karat as Karat))].sort((a, b) => b - a);
   const grams = Dec.sum(owned.map((r) => r.grams));
   const priced = summary.missingPrices.length === 0;
+  const others = KARATS.filter((k) => !karats.includes(k));
+  const priceRow = (k: Karat) => {
+    const p = prices.find((x) => x.karat === k);
+    const auto = feed?.perGram[k];
+    const mine = p?.my_price ? Dec.of(p.my_price) : null;
+    return `<div class="price-row">
+      <span><strong>${k}K</strong>
+        <span class="muted small">${mine ? `Using your price (set ${esc(dateTime(p!.my_price_at!))})` : auto ? `Using automatic: <strong>${money(auto)}</strong> EGP` : "No price"}</span>
+        ${mine && auto ? `<span class="muted small">Automatic now: ${money(auto)} EGP</span>` : ""}</span>
+      <span class="price-input">
+        <label class="suffix"><span class="sr-only">Your ${k}K price per gram</span>
+          <input name="k${k}" inputmode="decimal" value="${esc(mine ? mine.toString() : "")}" placeholder="Your price (optional)" aria-describedby="price-hint"><span>EGP</span></label>
+        ${mine ? `<button type="button" class="btn ghost small" data-auto="${k}">Use automatic</button>` : ""}
+      </span>
+    </div>`;
+  };
 
   root.innerHTML = `
     <div class="page-head"><div><h1>Gold</h1>
@@ -68,36 +84,24 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
         : "Automatic price not available right now."}
         Type your shop's buying price to use it instead.</p>
       <div class="price-rows">
-        ${karats.map((k) => {
-          const p = prices.find((x) => x.karat === k);
-          const auto = feed?.perGram[k];
-          const mine = p?.my_price ? Dec.of(p.my_price) : null;
-          return `<div class="price-row">
-            <span><strong>${k}K</strong>
-              <span class="muted small">${mine ? `Using your price (set ${esc(dateTime(p!.my_price_at!))})` : auto ? `Using automatic: <strong>${money(auto)}</strong> EGP` : "No price"}</span>
-              ${mine && auto ? `<span class="muted small">Automatic now: ${money(auto)} EGP</span>` : ""}</span>
-            <span class="price-input">
-              <label class="suffix"><span class="sr-only">Your ${k}K price per gram</span>
-                <input name="k${k}" inputmode="decimal" value="${esc(mine ? mine.toString() : "")}" placeholder="Your price (optional)" aria-describedby="price-hint"><span>EGP</span></label>
-              ${mine ? `<button type="button" class="btn ghost small" data-auto="${k}">Use automatic</button>` : ""}
-            </span>
-          </div>`;
-        }).join("")}
+        ${karats.map((k) => priceRow(k)).join("")}
       </div>
+      ${others.length ? `<details class="other-karats"><summary class="small">Other karats (${others.map((k) => `${k}K`).join(", ")})</summary>
+        <div class="price-rows">${others.map((k) => priceRow(k)).join("")}</div></details>` : ""}
       <button class="btn primary" type="submit">Save my prices</button>
       <p class="form-error" hidden></p>
     </form>
 
     <div class="card">
       <div class="section-head gold-head"><h2>Pieces</h2>
-        ${owned.length > 1 ? `<label class="inline-select">Set all to<select id="all-karat"><option value="">Karat…</option><option value="24">24K</option><option value="21">21K</option><option value="18">18K</option></select></label>` : ""}</div>
+        ${owned.length > 1 ? `<label class="inline-select">Set all to<select id="all-karat"><option value="">Karat…</option>${KARATS.map((k) => `<option value="${k}">${k}K</option>`).join("")}</select></label>` : ""}</div>
       <table class="table gold-table">
       <thead><tr><th>Piece</th><th class="num">Karat</th><th class="num">Grams</th><th class="num">Paid</th><th class="num">Value now</th><th class="num">Profit / loss</th><th class="num">Bought</th><th><span class="sr-only">Edit</span></th></tr></thead>
       <tbody>${owned.map((r, i) => {
         const v = byLabel.get(holdings[i]!);
         return `<tr><th scope="row">${esc(r.label)}</th>
           <td class="num" data-label="Karat"><select class="karat-select" data-id="${r.id}" aria-label="Karat of ${esc(r.label)}">
-            ${[24, 21, 18].map((k) => `<option value="${k}"${k === r.karat ? " selected" : ""}>${k}K</option>`).join("")}</select></td>
+            ${KARATS.map((k) => `<option value="${k}"${k === r.karat ? " selected" : ""}>${k}K</option>`).join("")}</select></td>
           <td class="num" data-label="Grams">${esc(Dec.of(r.grams).toString())}</td>
           <td class="num" data-label="Paid">${money(r.purchase_price)}</td>
           <td class="num${v ? "" : " muted"}" data-label="Value">${v ? money(v.market) : "needs price"}</td>
@@ -169,7 +173,7 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
     e.preventDefault();
     const err = form.querySelector<HTMLElement>(".form-error")!;
     const changes: { karat: Karat; price: string }[] = [];
-    for (const k of karats) {
+    for (const k of KARATS) {
       const raw = (form.elements.namedItem(`k${k}`) as HTMLInputElement).value.trim().replace(/[,\s]/g, "");
       const before = prices.find((x) => x.karat === k)?.my_price;
       if (raw && (!AMOUNT_RE.test(raw) || Dec.of(raw).isZero())) {
@@ -204,7 +208,7 @@ function editPiece(ctx: Ctx, row: HoldingRow | null): void {
       <h2>${row ? "Edit piece" : "Add a gold piece"}</h2>
       <label>Name<input name="label" maxlength="80" value="${esc(row?.label ?? "")}" placeholder="e.g. BTC 2.5g bar" required></label>
       <div class="row-2">
-        <label>Karat<select name="karat">${[24, 21, 18].map((k) => `<option value="${k}"${k === (row?.karat ?? 21) ? " selected" : ""}>${k}K</option>`).join("")}</select></label>
+        <label>Karat<select name="karat">${KARATS.map((k) => `<option value="${k}"${k === (row?.karat ?? 21) ? " selected" : ""}>${k}K</option>`).join("")}</select></label>
         <label>Grams<input name="grams" inputmode="decimal" value="${esc(row ? Dec.of(row.grams).toString() : "")}" placeholder="2.5" required></label>
       </div>
       <div class="row-2">

@@ -6,6 +6,7 @@ import { buildActuals } from "../engine/actuals.ts";
 import { compareAll, type MonthComparison } from "../engine/compare.ts";
 import { PlanTimeline, versionFromRow, type PlanVersionRow } from "../engine/plan.ts";
 import type { ActualMonth, ActualsInput, Checkin, PlanVersion } from "../engine/types.ts";
+import type { Goal } from "../engine/goal.ts";
 import type { Api } from "./api.ts";
 import { Dec } from "../engine/decimal.ts";
 import { valueHoldings } from "../engine/gold.ts";
@@ -55,6 +56,7 @@ export interface AppData {
   /** gold at today's price, when every karat you own has a price */
   goldValue: Dec | null;
   goldFeed: GoldFeed | null;
+  goal: Goal | null;
 }
 
 export async function loadProfile(api: Api): Promise<Profile | null> {
@@ -63,11 +65,12 @@ export async function loadProfile(api: Api): Promise<Profile | null> {
 }
 
 export async function loadData(api: Api, profile: Profile): Promise<AppData> {
-  const [versionRows, actualRows, goldRows, priceRows] = await Promise.all([
+  const [versionRows, actualRows, goldRows, priceRows, goalRow] = await Promise.all([
     api.rpc<(PlanVersionRow & { id: number; note: string; created_at: string })[]>("get_plan_versions"),
     api.rpc<ActualsRow>("get_actuals"),
     api.rpc<HoldingRow[]>("get_gold_holdings").catch(() => [] as HoldingRow[]),
     api.rpc<PriceRow[]>("get_gold_prices").catch(() => [] as PriceRow[]),
+    api.rpc<{ target_amount: string; target_month: string; monthly_savings_target: string | null } | null>("get_goal").catch(() => null),
   ]);
   const owned = goldRows.filter((g) => !g.sold_date);
   // only ask the internet when there is gold to value
@@ -126,5 +129,6 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
     comparisons,
     goldValue,
     goldFeed: feed,
+    goal: goalRow ? { targetAmount: goalRow.target_amount, targetMonth: goalRow.target_month, monthlySavingsTarget: goalRow.monthly_savings_target } : null,
   };
 }

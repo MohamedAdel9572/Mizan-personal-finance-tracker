@@ -109,7 +109,7 @@ select test.throws($$insert into public.actual_entries (month, item_key, amount)
                    '%check constraint%', 'negative actual rejected');
 select test.throws($$insert into public.unplanned_items (month, kind, name, amount) values ('2026-07-01', 'loan', 'x', 1)$$,
                    '%check constraint%', 'unknown unplanned type rejected');
-select test.throws($$insert into public.gold_holdings (label, karat, grams, purchase_price, purchase_date) values ('x', 22, 1, 1, '2026-01-01')$$,
+select test.throws($$insert into public.gold_holdings (label, karat, grams, purchase_price, purchase_date) values ('x', 20, 1, 1, '2026-01-01')$$,
                    '%check constraint%', 'unknown karat rejected');
 select test.throws($$insert into public.gold_holdings (label, karat, grams, purchase_price, purchase_date) values ('x', 21, 1, 1, current_date + 400)$$,
                    '%future%', 'future purchase date rejected');

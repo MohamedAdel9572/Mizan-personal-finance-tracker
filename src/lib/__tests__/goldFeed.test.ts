@@ -10,6 +10,9 @@ describe("automatic gold price", () => {
     expect(g[24]).toBe("6679.06");
     expect(g[21]).toBe("5844.17");
     expect(g[18]).toBe("5009.29");
+    expect(g[22]).toBe("6122.47");
+    expect(g[14]).toBe("3896.12");
+    expect(g[12]).toBe("3339.53");
   });
 
   it("parses the two API answers and rejects nonsense", () => {
@@ -22,7 +25,7 @@ describe("automatic gold price", () => {
   });
 
   it("your own price wins over the automatic one", () => {
-    const feed = { perGram: { 24: "6679.11", 21: "5844.22", 18: "5009.33" } as const };
+    const feed = { perGram: { 24: "6679.11", 22: "6122.52", 21: "5844.22", 18: "5009.33", 14: "3896.15", 12: "3339.56" } };
     const rows = [{ karat: 21 as const, my_price: "5900.00", my_price_at: "x", fetched_price: null, fetched_at: null, source: null }];
     expect(effectivePrices(rows, feed)[21]).toBe("5900.00");
     expect(effectivePrices([], feed)[21]).toBe("5844.22");

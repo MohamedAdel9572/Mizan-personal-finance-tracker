@@ -19,6 +19,9 @@ function stashForm(month: Month): void {
   stash = { month, values };
 }
 
+/** Where the month log lives: a panel on the Plan page. */
+export const LOG_BASE = "#/plan/log/";
+
 export function renderLog(root: HTMLElement, ctx: Ctx): void {
   const t = ctx.data.timeline;
   if (!t) {
@@ -69,10 +72,12 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
   };
 
   root.innerHTML = `
-    <div class="page-head">
-      <div><h1>Log actuals</h1>
-      <p class="muted small">Real numbers for the month. Planned amounts are filled in; change what was different.</p></div>
+    <div class="panel-head">
+      <div><h2>Log a month</h2>
+      <p class="muted small">Planned amounts are filled in; change what was different.</p></div>
+      <button type="button" class="icon-btn" data-close-panel aria-label="Close">×</button>
     </div>
+    ${comparisonSummary(ctx, month)}
     <div class="month-nav">
       <button class="icon-btn" data-go="${esc(addMonths(month, -1))}" aria-label="Previous month" ${month <= t.start ? "disabled" : ""}>‹</button>
       <label class="month-select"><span class="sr-only">Month</span>
@@ -80,7 +85,7 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
       </label>
       <button class="icon-btn" data-go="${esc(addMonths(month, 1))}" aria-label="Next month" ${month >= now ? "disabled" : ""}>›</button>
     </div>
-    ${checkin ? `<div class="notice ok notice-row"><span>Checked in. Saving again updates it.</span><a class="btn ghost small" href="#/compare/${esc(month)}">Plan vs actual</a></div>` : ""}
+    ${checkin ? `<div class="notice ok">Checked in. Saving again updates it.</div>` : ""}
 
     <div class="log-layout">
       <form id="checkin" class="card" novalidate>
@@ -96,7 +101,7 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
       </form>
 
       <section class="card">
-        <div class="section-head"><h2>Unplanned</h2><button class="btn ghost small desktop-only" data-add-unplanned>+ Add</button></div>
+        <div class="section-head"><h2>Unplanned</h2><button class="btn ghost small" data-add-unplanned>+ Add</button></div>
         ${unplanned.length ? `<ul class="plain-list">${unplanned.map((u) => `
           <li><div><span class="line-name">${esc(u.name)}</span>${u.note ? `<span class="muted small">${esc(u.note)}</span>` : ""}</div>
             <span class="num ${u.kind === "expense" ? "neg" : "pos"}">${u.kind === "expense" ? "-" : "+"}${money(u.amount)}</span>
@@ -104,7 +109,7 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
           : `<p class="muted small">Things that weren't in the plan, like a car repair or a gift. They count in this month's actuals.</p>`}
       </section>
     </div>
-    <button class="fab raised mobile-only" data-add-unplanned aria-label="Add unplanned item">+</button>`;
+    `;
 
   const form = root.querySelector<HTMLFormElement>("#checkin")!;
   if (stash?.month === month) {
@@ -172,7 +177,7 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
         });
         await ctx.reload();
         toast(`${monthLabel(month, true)} saved.`, "ok");
-        ctx.navigate(`#/compare/${month}`);
+        ctx.navigate("#/plan");
       } catch (err) {
         if (err instanceof ApiError && err.kind === "auth") ctx.fail(err);
         else formError(form, err instanceof ApiError ? err.message : "Could not save. Please try again.");
@@ -180,8 +185,8 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
     });
   });
 
-  root.querySelector<HTMLSelectElement>("#month")!.addEventListener("change", (e) => ctx.navigate(`#/log/${(e.target as HTMLSelectElement).value}`));
-  root.querySelectorAll<HTMLButtonElement>("[data-go]").forEach((b) => b.addEventListener("click", () => ctx.navigate(`#/log/${b.dataset.go}`)));
+  root.querySelector<HTMLSelectElement>("#month")!.addEventListener("change", (e) => ctx.navigate(`${LOG_BASE}${(e.target as HTMLSelectElement).value}`));
+  root.querySelectorAll<HTMLButtonElement>("[data-go]").forEach((b) => b.addEventListener("click", () => ctx.navigate(`${LOG_BASE}${b.dataset.go}`)));
   root.querySelectorAll<HTMLButtonElement>("[data-add-unplanned]").forEach((b) => b.addEventListener("click", () => addUnplanned(ctx, month)));
   root.querySelectorAll<HTMLButtonElement>("[data-del-unplanned]").forEach((b) => b.addEventListener("click", async () => {
     if (!confirm("Delete this item?")) return;
@@ -238,4 +243,17 @@ function addUnplanned(ctx: Ctx, month: Month): void {
       });
     });
   });
+}
+
+/** Planned vs actual summary for an already logged month (shown at the top of the panel). */
+function comparisonSummary(ctx: Ctx, month: Month): string {
+  const c = ctx.data.comparisons.find((x) => x.month === month && !x.assumed);
+  if (!c) return "";
+  const gap = c.net.gap;
+  return `<div class="panel-summary">
+    <span class="badge ${c.onPlan ? "good" : "bad"}">${c.onPlan ? "On plan" : "Behind plan"}</span>
+    <span>Net <strong class="num">${money(c.net.actual)}</strong> vs plan ${money(c.net.planned)}
+      <strong class="num ${gap.round(0).isNegative() ? "neg" : gap.round(0).isZero() ? "" : "pos"}">(${gap.round(0).isZero() ? "on plan" : signed(gap)})</strong></span>
+    ${c.biggestCause ? `<span class="muted">Biggest cause: ${esc(c.biggestCause.name)} ${signed(c.biggestCause.netEffect)}</span>` : ""}
+  </div>`;
 }

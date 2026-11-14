@@ -36,7 +36,7 @@ select test.eq((select summary from public.audit_events where event_type = 'uplo
 
 select test.throws($$select public.import_workbook(null, '[]', '[]',
   '[{"row": 11, "label": "x", "karat": 21, "grams": "1", "price": "1", "date": "2025-01-01"},
-    {"row": 12, "label": "y", "karat": 22, "grams": "1", "price": "1", "date": "2025-01-01"}]')$$,
+    {"row": 12, "label": "y", "karat": 20, "grams": "1", "price": "1", "date": "2025-01-01"}]')$$,
   '%Gold row 12: karat%', 'bad karat names the row');
 select test.eq((select count(*) from public.gold_holdings where label = 'x')::text, '0', 'a bad row saves nothing from the file (atomic)');
 select test.throws($$select public.import_workbook(null, '[{"row": 5, "month": "2026-07", "line": "Nope", "amount": "1"}]', '[]', '[]')$$,

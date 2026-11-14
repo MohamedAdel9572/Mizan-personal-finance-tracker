@@ -14,7 +14,7 @@
  * a price (with a warning and its time).
  */
 import { Dec } from "../engine/decimal.ts";
-import type { Karat } from "../engine/gold.ts";
+import { KARATS, type Karat } from "../engine/gold.ts";
 
 const GOLD_URL = "https://api.gold-api.com/price/XAU";
 const FX_URL = "https://open.er-api.com/v6/latest/USD";
@@ -37,11 +37,9 @@ export interface GoldFeed {
 
 export function perGramFor(spotUsdOz: Dec, usdEgp: Dec): Record<Karat, string> {
   const gram24 = spotUsdOz.div(GRAMS_PER_OZ).times(usdEgp);
-  return {
-    24: gram24.round(2).toString(),
-    21: gram24.times(21).div(24).round(2).toString(),
-    18: gram24.times(18).div(24).round(2).toString(),
-  };
+  const out = {} as Record<Karat, string>;
+  for (const k of KARATS) out[k] = gram24.times(k).div(24).round(2).toString();
+  return out;
 }
 
 async function getJson(url: string): Promise<unknown> {

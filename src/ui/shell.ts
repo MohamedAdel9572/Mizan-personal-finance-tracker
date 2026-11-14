@@ -15,8 +15,7 @@ const svg = (path: string) =>
 export const NAV: NavItem[] = [
   { route: "dashboard", label: "Dashboard", mobile: true, icon: svg('<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>') },
   { route: "plan", label: "Plan", mobile: true, icon: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/>') },
-  { route: "log", label: "Log", mobile: true, icon: svg('<path d="M12 5v14M5 12h14"/><circle cx="12" cy="12" r="9"/>') },
-  { route: "compare", label: "Plan vs actual", mobile: false, icon: svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>') },
+  { route: "plan/log", label: "Log", mobile: true, icon: svg('<path d="M12 5v14M5 12h14"/><circle cx="12" cy="12" r="9"/>') },
   { route: "gold", label: "Gold", mobile: true, icon: svg('<path d="M3 18h18l-3-6H6z"/><path d="M8 12l2-5h4l2 5"/>') },
   { route: "history", label: "History", mobile: true, icon: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>') },
 ];
@@ -32,7 +31,7 @@ export function shellHtml(active: string, userName: string): string {
   <div class="layout">
     <aside class="sidebar" aria-label="Main">
       <div class="brand"><span class="logo" aria-hidden="true">⚖</span> Mizan</div>
-      <nav>${NAV.map((n) => link(n, "side-link")).join("")}</nav>
+      <nav>${NAV.filter((n) => n.route !== "plan/log").map((n) => link(n, "side-link")).join("")}</nav>
       <a class="side-link${active === "settings" ? " active" : ""}" href="#/settings">${settingsIcon}<span>${esc(userName)}</span></a>
       <button type="button" class="side-link logout" data-logout>${logoutIcon}<span>Sign out</span></button>
     </aside>
@@ -40,7 +39,6 @@ export function shellHtml(active: string, userName: string): string {
       <header class="topbar">
         <div class="brand"><span class="logo" aria-hidden="true">⚖</span> Mizan</div>
         <div class="topbar-actions">
-          <a class="icon-btn${active === "compare" ? " active" : ""}" href="#/compare" aria-label="Plan vs actual">${NAV[3]!.icon}</a>
           <a class="icon-btn${active === "settings" ? " active" : ""}" href="#/settings" aria-label="Settings">${settingsIcon}</a>
           <button type="button" class="icon-btn" data-logout aria-label="Sign out" title="Sign out">${logoutIcon}</button>
         </div>

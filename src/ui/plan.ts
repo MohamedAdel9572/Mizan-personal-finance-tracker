@@ -2,6 +2,7 @@ import { Dec } from "../engine/decimal.ts";
 import { currentMonth, isMonth, monthRange, type Month } from "../engine/month.ts";
 import { planEnd, projectPlan } from "../engine/plan.ts";
 import type { PlanMonth, PlanVersion } from "../engine/types.ts";
+import type { MonthComparison } from "../engine/compare.ts";
 import { SEED_PLAN } from "../data/seed.ts";
 import { ApiError } from "../lib/api.ts";
 import { busy, esc, formError, openDialog, toast } from "../lib/dom.ts";
@@ -13,43 +14,118 @@ import {
 import type { VersionInfo } from "../lib/store.ts";
 import type { Ctx } from "./context.ts";
 import { renderImport } from "./importScreen.ts";
+import { LOG_BASE, renderLog } from "./log.ts";
 
 // ---------------------------------------------------------------------------
-//  View: spreadsheet-like month grid (desktop) / one month at a time (mobile)
+//  View: the plan grid with actuals on top. Each cell shows the PLANNED value;
+//  logged months get a status dot, and hovering (or tapping) a cell shows the
+//  actual. Clicking a month opens the log panel for that month.
 // ---------------------------------------------------------------------------
+
+type Status = "good" | "warn" | "bad";
+const STATUS_WORD: Record<Status, string> = { good: "On plan or better", warn: "Slightly behind (within 5%)", bad: "Behind plan" };
+
+/** Green when it helps your savings or matches the plan, amber when worse by up to 5%, red beyond that. */
+export function statusOf(effect: Dec, planned: Dec): Status {
+  if (!effect.isNegative() || effect.round(0).isZero()) return "good";
+  const base = planned.abs();
+  return !base.isZero() && effect.abs().lte(base.times("0.05")) ? "warn" : "bad";
+}
+
+interface Actual { planned: Dec; actual: Dec; effect: Dec; unit: "income" | "expense" | "neutral" }
 
 interface GridRow {
   label: string;
   cls: string;
   values: (r: PlanMonth) => Dec;
+  /** actual for a logged month, or null when there is nothing to compare */
+  actual?: (month: Month) => Actual | null;
 }
 
-function gridRows(v: PlanVersion): { section: string; rows: GridRow[] }[] {
-  const line = (key: string, name: string): GridRow => ({ label: name, cls: "line", values: (r) => r.lines.get(key) ?? Dec.ZERO });
-  const of = (kind: string) => v.items.filter((i) => i.kind === kind).map((i) => line(i.key, i.name));
+function gridRows(v: PlanVersion, ctx: Ctx): { section: string; rows: GridRow[] }[] {
+  const cmp = new Map(ctx.data.comparisons.filter((c) => !c.assumed).map((c) => [c.month, c]));
+  const act = new Map(ctx.data.actuals.filter((a) => !a.assumed).map((a) => [a.month, a]));
+  const lineActual = (key: string) => (m: Month): Actual | null => {
+    const l = cmp.get(m)?.lines.find((x) => x.key === key);
+    return l ? { planned: l.planned, actual: l.actual, effect: l.netEffect, unit: l.kind === "income" ? "income" : "expense" } : null;
+  };
+  const total = (pick: (c: MonthComparison) => { planned: Dec; actual: Dec; gap: Dec }, higherIsBetter: boolean, unit: Actual["unit"]) => (m: Month): Actual | null => {
+    const c = cmp.get(m);
+    if (!c) return null;
+    const t = pick(c);
+    return { planned: t.planned, actual: t.actual, effect: higherIsBetter ? t.gap : t.gap.neg(), unit };
+  };
+  const line = (key: string, name: string, withActual: boolean): GridRow => ({
+    label: name, cls: "line", values: (r) => r.lines.get(key) ?? Dec.ZERO, ...(withActual ? { actual: lineActual(key) } : {}),
+  });
+  const of = (kind: string) => v.items.filter((i) => i.kind === kind).map((i) => line(i.key, i.name, kind !== "asset"));
+  const unplanned = (kind: "income" | "expense"): GridRow[] => {
+    const items = ctx.data.unplanned.filter((u) => u.kind === kind);
+    if (!items.length) return [];
+    return [{
+      label: kind === "income" ? "Unplanned income" : "Unplanned expenses", cls: "line unplanned", values: () => Dec.ZERO,
+      actual: (m) => {
+        const sum = Dec.sum(items.filter((u) => u.month === m).map((u) => u.amount));
+        if (sum.isZero() || !cmp.has(m)) return null;
+        return { planned: Dec.ZERO, actual: sum, effect: kind === "income" ? sum : sum.neg(), unit: kind };
+      },
+    }];
+  };
   return [
-    { section: "Income", rows: [...of("income"), { label: "Total income", cls: "total", values: (r) => r.income }] },
-    { section: "Installments & expenses", rows: [...of("expense"), { label: "Total expenses", cls: "total", values: (r) => r.expenses }] },
+    { section: "Income", rows: [...of("income"), ...unplanned("income"), { label: "Total income", cls: "total", values: (r) => r.income, actual: total((c) => c.income, true, "income") }] },
+    { section: "Installments & expenses", rows: [...of("expense"), ...unplanned("expense"), { label: "Total expenses", cls: "total", values: (r) => r.expenses, actual: total((c) => c.expenses, false, "expense") }] },
     {
       section: "Savings",
       rows: [
-        { label: "Net", cls: "total signed", values: (r) => r.net },
-        { label: "Interest", cls: "line", values: (r) => r.interest },
-        { label: "Savings balance", cls: "total signed", values: (r) => r.balance },
+        { label: "Net", cls: "total signed", values: (r) => r.net, actual: total((c) => c.net, true, "neutral") },
+        {
+          label: "Interest", cls: "line", values: (r) => r.interest,
+          actual: (m) => {
+            const a = act.get(m);
+            const p = ctx.data.timeline?.planned(m);
+            return a && p ? { planned: p.interest, actual: a.interest, effect: a.interest.minus(p.interest), unit: "neutral" } : null;
+          },
+        },
+        { label: "Savings balance", cls: "total signed", values: (r) => r.balance, actual: total((c) => c.balance, true, "neutral") },
       ],
     },
-    { section: "Assets", rows: [...of("asset"), { label: "Net worth", cls: "grand", values: (r) => r.netWorth }] },
+    { section: "Assets", rows: [...of("asset"), { label: "Net worth", cls: "grand", values: (r) => r.netWorth, actual: total((c) => c.netWorth, true, "neutral") }] },
   ];
 }
 
-function cell(d: Dec, signedCls: boolean): string {
+function gapWords(a: Actual): string {
+  const gap = a.actual.minus(a.planned);
+  if (gap.round(0).isZero()) return "as planned";
+  const amount = money(gap.abs());
+  if (a.unit === "expense") return gap.gt(0) ? `${amount} over plan` : `${amount} under plan`;
+  return gap.gt(0) ? `${amount} above plan` : `${amount} below plan`;
+}
+
+function tipText(month: Month, a: Actual, st: Status): string {
+  return `${monthLabel(month, true)} · ${STATUS_WORD[st]}\nActual ${money(a.actual)} · Planned ${money(a.planned)}\n${gapWords(a)}`;
+}
+
+function cell(d: Dec, signedCls: boolean, month: Month, actual: Actual | null): string {
   const neg = d.isNegative() && d.round(0).isNegative();
   const zero = d.round(0).isZero();
-  return `<td class="num${neg && signedCls ? " neg" : ""}${zero ? " zero" : ""}">${zero ? "–" : money(d)}</td>`;
+  const text = zero ? "–" : money(d);
+  if (!actual) return `<td class="num${neg && signedCls ? " neg" : ""}${zero ? " zero" : ""}">${text}</td>`;
+  const st = statusOf(actual.effect, actual.planned);
+  return `<td class="num has-actual${neg && signedCls ? " neg" : ""}${zero ? " zero" : ""}" tabindex="0" data-tip="${esc(tipText(month, actual, st))}">`
+    + `<span class="dot-status ${st}" aria-hidden="true"></span>${text}<span class="sr-only">, ${esc(STATUS_WORD[st])}, actual ${money(actual.actual)}</span></td>`;
 }
 
 let selectedVersionNo: number | null = null;
 let mobileMonthIndex = -1;
+
+/** First month that still needs logging (or this month). */
+function logTarget(ctx: Ctx): Month | null {
+  const t = ctx.data.timeline;
+  const now = currentMonth();
+  if (!t || now < t.start) return null;
+  const done = new Set(ctx.data.checkins.map((c) => c.month));
+  return monthRange(t.start, now).find((m) => !done.has(m)) ?? now;
+}
 
 export function renderPlan(root: HTMLElement, ctx: Ctx): void {
   if (ctx.params[0] === "edit") return renderEditor(root, ctx, ctx.params[1] === "sample");
@@ -73,11 +149,24 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
   const v = info.version;
   const rows = projectPlan(v);
   const now = currentMonth();
-  const groups = gridRows(v);
+  const groups = gridRows(v, ctx);
+  const logged = new Map(ctx.data.comparisons.filter((c) => !c.assumed).map((c) => [c.month, c]));
+  const target = logTarget(ctx);
+  const canLog = (m: Month) => !!ctx.data.timeline && m >= ctx.data.timeline.start && m <= now;
   if (mobileMonthIndex < 0 || mobileMonthIndex >= rows.length) {
     const i = rows.findIndex((r) => r.month === now);
     mobileMonthIndex = i >= 0 ? i : 0;
   }
+  const mm = rows[mobileMonthIndex]!;
+
+  const monthHead = (m: Month) => {
+    const c = logged.get(m);
+    const dot = c ? `<span class="dot-status ${c.onPlan ? "good" : "bad"}" aria-hidden="true"></span>` : canLog(m) ? `<span class="dot-status empty" aria-hidden="true"></span>` : "";
+    const label = esc(monthLabel(m));
+    if (!canLog(m)) return `<th scope="col" class="num${m === now ? " current" : ""}">${label}</th>`;
+    const what = c ? `${monthLabel(m, true)}: ${c.onPlan ? "on plan" : "behind plan"}. Open to see or edit the actuals` : `Log ${monthLabel(m, true)}`;
+    return `<th scope="col" class="num${m === now ? " current" : ""}"><a class="month-link" href="${LOG_BASE}${m}" title="${esc(what)}" aria-label="${esc(what)}">${dot}${label}</a></th>`;
+  };
 
   root.innerHTML = `
     <div class="page-head">
@@ -88,12 +177,13 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
       <div class="head-actions">
         <label class="sr-only" for="version">Plan version</label>
         <select id="version">${versions.map((x) => `<option value="${x.version.versionNo}"${x === info ? " selected" : ""}>${esc(versionLabel(x))}</option>`).join("")}</select>
-        <a class="btn ghost" href="#/plan/import">Import Excel</a>
-        <a class="btn ghost" href="/Mizan-template.xlsx" download>Template</a>
-        <a class="btn primary" href="#/plan/edit">Edit plan</a>
+        ${target ? `<a class="btn primary" href="${LOG_BASE}${target}">Log ${esc(monthLabel(target, true))}</a>` : ""}
+        <a class="btn ghost" href="#/plan/edit">Edit plan</a>
         <details class="menu">
           <summary class="icon-btn" aria-label="More plan actions" title="More">⋯</summary>
           <div class="menu-list" role="menu">
+            <a role="menuitem" href="#/plan/import"><strong>Import from Excel</strong><span class="muted small">The template or your own month-by-month sheet</span></a>
+            <a role="menuitem" href="/Mizan-template.xlsx" download><strong>Download template</strong><span class="muted small">Empty Excel file in the right format</span></a>
             <button type="button" role="menuitem" id="undo-version" ${versions.length > 1 ? "" : "disabled"}>
               <strong>Undo last change</strong><span class="muted small">${versions.length > 1 ? `Delete version ${versions[0]!.version.versionNo}; version ${versions[1]!.version.versionNo} becomes current` : "Only one version, nothing to undo"}</span></button>
             <button type="button" role="menuitem" id="delete-plan" class="danger-item">
@@ -103,15 +193,21 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
       </div>
     </div>
     ${info !== versions[0] ? `<p class="notice">You are looking at an older version. Months from ${esc(monthLabel(v.effectiveFrom, true))} were compared with it until a newer version took over.</p>` : ""}
-    ${info.note ? `<p class="muted small">Note: ${esc(info.note)}</p>` : ""}
+    <div class="legend" aria-label="What the dots mean">
+      <span><span class="dot-status good"></span>On plan or better</span>
+      <span><span class="dot-status warn"></span>Slightly behind (≤ 5%)</span>
+      <span><span class="dot-status bad"></span>Behind plan</span>
+      <span class="muted"><span class="desktop-only">Numbers are the plan. Hover a cell to see the actual; click a month to log it.</span><span class="mobile-only">Numbers are the plan; the actual is shown under each line.</span></span>
+    </div>
 
-    <div class="grid-wrap desktop-only" role="region" aria-label="Plan by month" tabindex="0">
+    <div class="grid-wrap desktop-only" role="region" aria-label="Plan by month with actuals" tabindex="0">
       <table class="grid">
-        <thead><tr><th class="sticky-col" scope="col">Line</th>${rows.map((r) => `<th scope="col" class="num${r.month === now ? " current" : ""}">${esc(monthLabel(r.month))}</th>`).join("")}</tr></thead>
+        <thead><tr><th class="sticky-col" scope="col">Line</th>${rows.map((r) => monthHead(r.month)).join("")}</tr></thead>
         <tbody>
           ${groups.map((g) => `
             <tr class="section"><th class="sticky-col" scope="rowgroup" colspan="1">${esc(g.section)}</th><td colspan="${rows.length}"></td></tr>
-            ${g.rows.map((row) => `<tr class="${row.cls}"><th class="sticky-col" scope="row">${esc(row.label)}</th>${rows.map((r) => cell(row.values(r), row.cls.includes("signed") || row.cls === "grand")).join("")}</tr>`).join("")}
+            ${g.rows.map((row) => `<tr class="${row.cls}"><th class="sticky-col" scope="row">${esc(row.label)}</th>${rows.map((r) =>
+              cell(row.values(r), row.cls.includes("signed") || row.cls === "grand", r.month, row.actual ? row.actual(r.month) : null)).join("")}</tr>`).join("")}
           `).join("")}
         </tbody>
       </table>
@@ -120,22 +216,45 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
     <section class="month-view mobile-only" aria-label="Plan for one month">
       <div class="month-nav">
         <button class="icon-btn" data-step="-1" aria-label="Previous month">‹</button>
-        <div class="month-title"><strong>${esc(monthLabel(rows[mobileMonthIndex]!.month, true))}</strong><span class="muted small">${mobileMonthIndex + 1} of ${rows.length}</span></div>
+        <div class="month-title"><strong>${logged.get(mm.month) ? `<span class="dot-status ${logged.get(mm.month)!.onPlan ? "good" : "bad"}"></span>` : ""}${esc(monthLabel(mm.month, true))}</strong><span class="muted small">${mobileMonthIndex + 1} of ${rows.length}</span></div>
         <button class="icon-btn" data-step="1" aria-label="Next month">›</button>
       </div>
+      ${canLog(mm.month) ? `<a class="btn ${logged.has(mm.month) ? "ghost" : "primary"} block" href="${LOG_BASE}${mm.month}">${logged.has(mm.month) ? "Edit" : "Log"} ${esc(monthLabel(mm.month, true))}</a>` : ""}
       <div class="swipe">${groups.map((g) => `
         <div class="card list-card">
           <h3>${esc(g.section)}</h3>
           ${g.rows.map((row) => {
-            const d = row.values(rows[mobileMonthIndex]!);
-            if (row.cls === "line" && d.isZero()) return "";
+            const d = row.values(mm);
+            const a = row.actual ? row.actual(mm.month) : null;
+            if (row.cls.startsWith("line") && d.isZero() && !a) return "";
             const neg = d.round(0).isNegative();
-            return `<div class="kv ${row.cls}"><span>${esc(row.label)}</span><span class="num${neg ? " neg" : ""}">${money(d)}</span></div>`;
+            const st = a ? statusOf(a.effect, a.planned) : null;
+            return `<div class="kv ${row.cls}"><span>${esc(row.label)}${a ? `<span class="kv-actual muted small">actual ${money(a.actual)} · ${esc(gapWords(a))}</span>` : ""}</span>
+              <span class="num${neg ? " neg" : ""}">${st ? `<span class="dot-status ${st}" aria-label="${esc(STATUS_WORD[st])}"></span>` : ""}${d.round(0).isZero() ? "–" : money(d)}</span></div>`;
           }).join("")}
         </div>`).join("")}
       </div>
     </section>
 `;
+
+  // tooltip that follows the hovered / focused cell (works inside the scrolling grid)
+  const tip = document.getElementById("grid-tip") ?? Object.assign(document.createElement("div"), { id: "grid-tip", role: "tooltip" });
+  if (!tip.isConnected) document.body.append(tip);
+  const show = (el: HTMLElement) => {
+    tip.textContent = el.dataset.tip ?? "";
+    tip.className = "grid-tip show";
+    const r = el.getBoundingClientRect();
+    const w = tip.offsetWidth;
+    tip.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2))}px`;
+    tip.style.top = `${r.top - tip.offsetHeight - 8 < 8 ? r.bottom + 8 : r.top - tip.offsetHeight - 8}px`;
+  };
+  const hide = () => (tip.className = "grid-tip");
+  const grid = root.querySelector<HTMLElement>(".grid-wrap");
+  grid?.addEventListener("mouseover", (e) => { const el = (e.target as HTMLElement).closest<HTMLElement>("[data-tip]"); if (el) show(el); });
+  grid?.addEventListener("mouseout", (e) => { if ((e.target as HTMLElement).closest("[data-tip]")) hide(); });
+  grid?.addEventListener("focusin", (e) => { const el = (e.target as HTMLElement).closest<HTMLElement>("[data-tip]"); if (el) show(el); });
+  grid?.addEventListener("focusout", hide);
+  grid?.addEventListener("scroll", hide, { passive: true });
 
   root.querySelector("#undo-version")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget as HTMLButtonElement;
@@ -172,6 +291,22 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
   swipe.addEventListener("touchend", (e) => {
     const dx = (e.changedTouches[0]?.clientX ?? 0) - x0;
     if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
+  });
+
+  // #/plan/log/<month>: the log panel opens on top of the grid
+  if (ctx.params[0] === "log") openLogPanel(ctx, ctx.params[1] ?? "");
+}
+
+function openLogPanel(ctx: Ctx, month: string): void {
+  const dialog = openDialog(`<div class="log-panel"></div>`, (d) => {
+    d.classList.add("wide");
+    const body = d.querySelector<HTMLElement>(".log-panel")!;
+    renderLog(body, { ...ctx, params: month ? [month] : [] });
+    body.querySelector("[data-close-panel]")?.addEventListener("click", () => d.close());
+  });
+  // closing by the user (×, Esc, backdrop) goes back to the plan; closing because the route changed doesn't
+  dialog.addEventListener("close", () => {
+    if (dialog.dataset.closing !== "route" && location.hash.startsWith(LOG_BASE)) ctx.navigate("#/plan");
   });
 }
 

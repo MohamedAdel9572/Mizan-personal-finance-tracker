@@ -11,7 +11,10 @@ select test.throws($$select public.add_gold_holding('{}')$$, '%sign in%', 'add n
 select test.act_as(:'tok_l');
 select public.add_gold_holding('{"label": " BTC 2.5g ", "karat": 21, "grams": "2.5", "price": "12,510", "date": "2025-03-21"}') as gid \gset
 select test.eq(public.get_gold_holdings()#>>'{0,label}', 'BTC 2.5g', 'piece added, name trimmed');
-select test.throws($$select public.add_gold_holding('{"label": "x", "karat": 22, "grams": "1", "price": "1", "date": "2025-01-01"}')$$, '%24, 21 or 18%', 'bad karat rejected');
+select test.throws($$select public.add_gold_holding('{"label": "x", "karat": 20, "grams": "1", "price": "1", "date": "2025-01-01"}')$$, '%24, 22, 21, 18, 14 or 12%', 'bad karat rejected');
+select public.add_gold_holding('{"label": "Old chain", "karat": 14, "grams": "3", "price": "4000", "date": "2025-01-01"}');
+select test.eq((select count(*) from public.gold_holdings where karat = 14)::text, '1', '14K accepted');
+select public.delete_gold_holding((select id from public.gold_holdings where karat = 14));
 select test.throws($$select public.add_gold_holding('{"label": "x", "karat": 24, "grams": "0", "price": "1", "date": "2025-01-01"}')$$, '%more than 0%', 'zero grams rejected');
 select test.throws($$select public.add_gold_holding('{"label": "x", "karat": 24, "grams": "1", "price": "-1", "date": "2025-01-01"}')$$, '%negative%', 'negative price rejected');
 select test.throws($$select public.add_gold_holding('{"label": "", "karat": 24, "grams": "1", "price": "1", "date": "2025-01-01"}')$$, '%Name is required%', 'empty name rejected');
