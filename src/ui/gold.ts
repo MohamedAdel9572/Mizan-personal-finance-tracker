@@ -30,7 +30,7 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
   if (owned.length === 0) {
     root.innerHTML = `<div class="page-head"><h1>Gold</h1></div>` +
       emptyState("No gold yet", "Add your pieces one by one, or import them from Excel (Gold sheet).") +
-      `<div class="center quick-actions" style="justify-content:center"><button class="btn primary" id="add-gold">+ Add a piece</button><a class="btn ghost" href="#/plan/import">Import from Excel</a></div>`;
+      `<div class="center quick-actions" style="justify-content:center"><button class="btn primary" id="add-gold">+ Add a piece</button></div>`;
     root.querySelector("#add-gold")!.addEventListener("click", () => editPiece(ctx, null));
     return;
   }
@@ -63,17 +63,19 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
   root.innerHTML = `
     <div class="page-head"><div><h1>Gold</h1>
       <p class="muted small">Value = grams × today's Egyptian shop buying price per gram, updated automatically every 30 minutes.</p></div>
-      <div class="head-actions"><a class="btn ghost" href="#/plan/import">Import from Excel</a><button class="btn primary" id="add-gold">+ Add a piece</button></div></div>
+      <div class="head-actions"><button class="btn primary" id="add-gold">+ Add a piece</button></div></div>
 
-    <div class="stats-grid">
+    <div class="gold-top">
+    <div class="gold-stats">
       <div class="card stat"><span class="stat-label">Value now</span>
         <span class="stat-value num${priced ? "" : " muted"}">${priced ? egp(summary.market) : "Needs price"}</span>
         <span class="small muted">${owned.length} pieces · ${esc(grams.toString())} g</span></div>
       <div class="card stat"><span class="stat-label">Paid</span><span class="stat-value num">${egp(Dec.sum(owned.map((r) => r.purchase_price)))}</span></div>
       <div class="card stat"><span class="stat-label">Profit / loss</span>
         <span class="stat-value num ${priced ? (summary.profitMarket.isNegative() ? "neg" : "pos") : "muted"}">${priced ? signed(summary.profitMarket) : "Needs price"}</span>
-        <span class="small muted">${priced && !summary.cost.isZero() ? `${summary.profitMarket.div(summary.cost).times(100).toFixed(1)}% on what you paid` : "set a price below"}</span></div>
+        <span class="small muted">${priced && !summary.cost.isZero() ? `${summary.profitMarket.div(summary.cost).times(100).toFixed(1)}% on what you paid` : "set a price"}</span></div>
     </div>
+    <div class="gold-side">
 
     ${feed?.stale ? `<div class="alert warning" role="status">Couldn't reach the price service. Showing the last price from ${esc(dateTime(feed.fetchedAt))}.</div>` : ""}
     ${!feed && !priced ? `<div class="alert warning" role="status"><strong>Couldn't get the gold price from the internet.</strong> Type today's price per gram below, or try Refresh.</div>` : ""}
@@ -101,6 +103,8 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
       <button class="btn primary" type="submit">Save my prices</button>
       <p class="form-error" hidden></p>
     </form>
+    </div>
+    </div>
 
     <div class="card">
       <div class="section-head gold-head"><h2>Pieces</h2></div>
