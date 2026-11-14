@@ -32,8 +32,10 @@ export function shellHtml(active: string, userName: string): string {
     <aside class="sidebar" aria-label="Main">
       <div class="brand"><span class="logo" aria-hidden="true">⚖</span> Mizan</div>
       <nav>${NAV.filter((n) => n.route !== "plan/log").map((n) => link(n, "side-link")).join("")}</nav>
-      <a class="side-link${active === "settings" ? " active" : ""}" href="#/settings">${settingsIcon}<span>${esc(userName)}</span></a>
-      <button type="button" class="side-link logout" data-logout>${logoutIcon}<span>Sign out</span></button>
+      <div class="side-account">
+        <a class="side-link${active === "settings" ? " active" : ""}" href="#/settings">${settingsIcon}<span>${esc(userName)}</span></a>
+        <button type="button" class="side-link logout" data-logout>${logoutIcon}<span>Sign out</span></button>
+      </div>
     </aside>
     <div class="main-col">
       <header class="topbar">

@@ -100,7 +100,10 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
     display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; height: 100svh;
     padding: 20px 12px; background: var(--surface); border-right: 1px solid var(--border);
   }
-  .sidebar nav { display: flex; flex-direction: column; gap: 2px; flex: 1; margin-top: 20px; }
+  .sidebar nav { display: flex; flex-direction: column; gap: 2px; margin-top: 20px; }
+  /* account right under the pages (not pinned to the bottom): nothing moves when a tablet's
+     address bar shows or hides, and there is no odd gap under it */
+  .side-account { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
   .side-link {
     display: flex; align-items: center; gap: 12px; padding: 10px 12px; min-height: var(--tap); border-radius: 10px;
     color: var(--text); text-decoration: none; font-weight: 500;
