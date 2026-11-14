@@ -12,6 +12,7 @@ import { loadingHtml, shellHtml } from "./ui/shell.ts";
 import { renderDashboard } from "./ui/dashboard.ts";
 import { applyTheme, renderSettings } from "./ui/simple.ts";
 import { startMonthPickers } from "./ui/monthPicker.ts";
+import { startNumberInputs } from "./ui/numberInputs.ts";
 
 const app = document.getElementById("app")!;
 const url = (import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
@@ -19,6 +20,7 @@ const key = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim();
 
 applyTheme();
 startMonthPickers();
+startNumberInputs();
 
 const SCREENS: Record<string, (root: HTMLElement, ctx: Ctx) => void> = {
   dashboard: renderDashboard,

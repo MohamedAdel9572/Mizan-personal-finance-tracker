@@ -89,7 +89,7 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
         <div><strong>Match your shop</strong>
           <span class="muted small">Used only while the Egyptian shop price can't be loaded. Shops in Egypt are usually a little above the world price; this % is added to it. 0 = world price.</span></div>
         <div class="adjust-input">
-          <label class="suffix"><span class="sr-only">Adjustment in percent</span><input name="adjust" inputmode="decimal" value="${esc(adjPct)}" aria-describedby="price-hint"><span>%</span></label>
+          <label class="suffix"><span class="sr-only">Adjustment in percent</span><input name="adjust" inputmode="decimal" data-num="signed-pct" maxlength="6" value="${esc(adjPct)}" aria-describedby="price-hint"><span>%</span></label>
           ${feed ? `<button type="button" class="btn ghost small" id="calc-adjust">Work it out</button>` : ""}
         </div>
       </div>`}
@@ -257,7 +257,7 @@ function editPiece(ctx: Ctx, row: HoldingRow | null): void {
       <label>Name<input name="label" maxlength="80" value="${esc(row?.label ?? "")}" placeholder="e.g. BTC 2.5g bar" required></label>
       <div class="row-2">
         <label>Karat<select name="karat">${KARATS.map((k) => `<option value="${k}"${k === (row?.karat ?? 21) ? " selected" : ""}>${k}K</option>`).join("")}</select></label>
-        <label>Grams<input name="grams" inputmode="decimal" value="${esc(row ? Dec.of(row.grams).toString() : "")}" placeholder="2.5" required></label>
+        <label>Grams<input name="grams" inputmode="decimal" data-num="grams" value="${esc(row ? Dec.of(row.grams).toString() : "")}" placeholder="2.5" required></label>
       </div>
       <div class="row-2">
         <label>Paid (total EGP)<input name="price" inputmode="decimal" value="${esc(row ? Dec.of(row.purchase_price).toString() : "")}" placeholder="12510" required></label>

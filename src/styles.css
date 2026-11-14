@@ -148,8 +148,10 @@ select { appearance: auto; }
 .row-2, .row-3 { display: grid; gap: 0 12px; grid-template-columns: 1fr 1fr; }
 .row-3 { grid-template-columns: 1fr; }
 @media (min-width: 640px) { .row-3 { grid-template-columns: repeat(3, 1fr); } }
-.suffix { position: relative; }
-.suffix span { position: absolute; right: 12px; bottom: 11px; color: var(--muted); }
+.suffix { position: relative; display: block; }
+.suffix > span:not(.sr-only) { position: absolute; right: 12px; bottom: 11px; color: var(--muted); pointer-events: none; }
+/* leave room for the % / EGP sign so typing never runs under it */
+.suffix input { width: 100%; padding-right: 3.4em; }
 
 .notice { background: var(--info-soft); padding: 10px 14px; border-radius: 10px; margin: 0 0 16px; }
 .notice.ok { background: var(--good-soft); }

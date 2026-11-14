@@ -36,7 +36,7 @@ export function renderSettings(root: HTMLElement, ctx: Ctx, onSignedOut: () => v
         <p class="muted small">On the Actual tab a line is <span class="dot-status good"></span>green when it's on plan or better,
           <span class="dot-status warn"></span>yellow when it's a little worse, and <span class="dot-status bad"></span>red beyond that.</p>
         <label>Yellow up to this % worse than the plan
-          <span class="suffix"><input name="warn" inputmode="decimal" value="${esc(Dec.of(ctx.data.settings.warnPct).toString())}" aria-describedby="warn-hint"><span>%</span></span></label>
+          <span class="suffix"><input name="warn" inputmode="decimal" data-num="pct" maxlength="5" value="${esc(Dec.of(ctx.data.settings.warnPct).toString())}" aria-describedby="warn-hint"><span>%</span></span></label>
         <p class="muted small" id="warn-hint">Example with 5%: Car planned 8,000 and you paid 8,300 (3.75% more) shows yellow; 8,500 (6.25% more) shows red. 0 means anything worse is red.</p>
         <button class="btn primary" type="submit">Save</button>
         <p class="form-error" hidden></p>

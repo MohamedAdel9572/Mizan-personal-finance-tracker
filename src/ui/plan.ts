@@ -520,7 +520,7 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
         ${d.rates.map((r, k) => `
           <div class="amount-row">
             <label><span class="sr-only">From month</span><input type="month" data-rate="${k}" data-f="from" value="${esc(r.from)}" ${k === 0 ? "disabled title=\"Same as the start month\"" : ""}></label>
-            <label class="suffix"><span class="sr-only">Rate</span><input inputmode="decimal" data-rate="${k}" data-f="rate" value="${esc(r.rate)}"><span>%</span></label>
+            <label class="suffix"><span class="sr-only">Rate</span><input inputmode="decimal" data-num="pct" maxlength="6" data-rate="${k}" data-f="rate" value="${esc(r.rate)}"><span>%</span></label>
             <button type="button" class="icon-btn danger" data-del-rate="${k}" aria-label="Remove rate"${d.rates.length === 1 ? " disabled" : ""}>×</button>
           </div>`).join("")}
         <button type="button" class="btn ghost small" data-add-rate>+ Rate changes from…</button>
