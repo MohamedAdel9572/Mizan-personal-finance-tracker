@@ -98,6 +98,9 @@ export function renderDashboard(root: HTMLElement, ctx: Ctx): void {
     </div>
     <p class="muted small center"><a href="#/history/months">See every month in History →</a></p>`;
 
+  const kpis = root.querySelector<HTMLElement>(".kpis");
+  kpis?.style.setProperty("--n", String(kpis.children.length));
+
   // ---------- charts ----------
   const n = (d: Dec | undefined | null) => (d ? d.toNumber() : null);
   const fmtEgp = (v: number) => compact(v);
