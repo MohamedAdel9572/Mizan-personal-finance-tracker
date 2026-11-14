@@ -23,13 +23,15 @@ import { LOG_BASE, planReturn, renderLog } from "./log.ts";
 // ---------------------------------------------------------------------------
 
 type Status = "good" | "warn" | "bad";
-const STATUS_WORD: Record<Status, string> = { good: "On plan or better", warn: "Slightly behind (within 5%)", bad: "Behind plan" };
+let STATUS_WORD: Record<Status, string> = { good: "On plan or better", warn: "Slightly behind (within 5%)", bad: "Behind plan" };
+/** "slightly behind" band in %, from Settings */
+let warnPct = "5";
 
-/** Green when it helps your savings or matches the plan, amber when worse by up to 5%, red beyond that. */
-export function statusOf(effect: Dec, planned: Dec): Status {
+/** Green when it helps your savings or matches the plan, amber when worse by up to `pct`% (Settings, default 5), red beyond that. */
+export function statusOf(effect: Dec, planned: Dec, pct: string = warnPct): Status {
   if (!effect.isNegative() || effect.round(0).isZero()) return "good";
   const base = planned.abs();
-  return !base.isZero() && effect.abs().lte(base.times("0.05")) ? "warn" : "bad";
+  return !base.isZero() && effect.abs().lte(base.times(Dec.of(pct).div(100))) ? "warn" : "bad";
 }
 
 interface Actual { planned: Dec; actual: Dec; effect: Dec; unit: "income" | "expense" | "neutral" }
@@ -164,6 +166,9 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
     return;
   }
 
+  warnPct = ctx.data.settings.warnPct;
+  const pctText = Dec.of(warnPct).toString();
+  STATUS_WORD = { ...STATUS_WORD, warn: `Slightly behind (within ${pctText}%)` };
   // #/plan = what you expect (plan only), #/plan/actual = what really happened
   const tab: "plan" | "actual" = ctx.params[0] === "actual" ? "actual" : ctx.params[0] === "log" ? planReturn.tab : "plan";
   planReturn.tab = tab;
@@ -224,7 +229,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
         ? `<p class="muted small">What you expect each month. Switch to Actual to see what really happened.</p>`
         : `<div class="legend" aria-label="What the dots mean">
             <span><span class="dot-status good"></span>On plan or better</span>
-            <span><span class="dot-status warn"></span>Slightly behind (≤ 5%)</span>
+            <span><span class="dot-status warn"></span>Slightly behind (≤ ${pctText}%) <a class="small" href="#/settings" title="Change this limit in Settings">change</a></span>
             <span><span class="dot-status bad"></span>Behind plan</span>
             <span><span class="dot-status pending"></span>Not logged yet</span>
             <span class="muted desktop-only">Empty months are not logged yet. Hover a cell to see the plan.</span>

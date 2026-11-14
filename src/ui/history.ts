@@ -1,6 +1,6 @@
 // History: a timeline of every change, and every logged month with its result.
 import { isMonth } from "../engine/month.ts";
-import { emptyState, esc } from "../lib/dom.ts";
+import { emptyState, esc, toast } from "../lib/dom.ts";
 import { money, monthLabel, signed } from "../lib/format.ts";
 import { loadingHtml } from "./shell.ts";
 import type { Ctx } from "./context.ts";
@@ -74,7 +74,8 @@ let filterMonth = "all";
 
 export function renderHistory(root: HTMLElement, ctx: Ctx): void {
   const tab = ctx.params[0] === "months" ? "months" : "timeline";
-  const head = `<div class="page-head"><div><h1>History</h1><p class="muted small">Every change you made, and every month you logged.</p></div></div>
+  const head = `<div class="page-head"><div><h1>History</h1><p class="muted small">Every change you made, and every month you logged.</p></div>
+      ${tab === "timeline" ? `<div class="head-actions"><button class="btn ghost danger-text" id="clear-history" hidden>Clear history</button></div>` : ""}</div>
     <div class="segmented tabs" role="tablist">
       <a role="tab" href="#/history" class="${tab === "timeline" ? "on" : ""}" aria-selected="${tab === "timeline"}">Timeline</a>
       <a role="tab" href="#/history/months" class="${tab === "months" ? "on" : ""}" aria-selected="${tab === "months"}">Months</a>
@@ -89,6 +90,27 @@ export function renderHistory(root: HTMLElement, ctx: Ctx): void {
       root.innerHTML = head + emptyState("Nothing yet", "Saving your plan, logging a month or importing a file shows up here.");
       return;
     }
+    const clearBtn = () => root.querySelector<HTMLButtonElement>("#clear-history");
+    const wireClear = () => {
+      const b = clearBtn();
+      if (!b) return;
+      b.hidden = false;
+      b.addEventListener("click", async () => {
+        if (!confirm(`Clear all ${events.length} entries from your history?\n\nOnly this list is cleared. Your plan, logged months and gold stay as they are. This can't be undone.`)) return;
+        b.disabled = true;
+        try {
+          await ctx.api.rpc("clear_history");
+          filterCat = "all";
+          filterMonth = "all";
+          toast("History cleared.", "ok");
+          renderHistory(root, ctx);
+        } catch (err) {
+          b.disabled = false;
+          ctx.fail(err);
+        }
+      });
+    };
+    queueMicrotask(wireClear);
     const months = [...new Set(events.map((e) => e.month).filter((m): m is string => !!m && isMonth(m)))].sort().reverse();
     const shown = events.filter((e) => (filterCat === "all" || category(e) === filterCat) && (filterMonth === "all" || e.month === filterMonth));
     const groups = group(shown);

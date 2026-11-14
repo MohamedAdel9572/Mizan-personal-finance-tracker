@@ -110,7 +110,9 @@ cached in the browser so a failed call still shows the last price with a warning
 for a server-side Edge Function to keep the API key secret; with no key there is nothing to hide,
 so this is simpler and has no server to deploy. Egyptian shop prices are usually within a few
 percent of this; a price you type on the Gold page always wins.
-Karats 24, 22, 21, 18, 14 and 12 are supported, in the app and in the Excel template. The
+Shops in Egypt usually sit a little above world price × bank rate, so the Gold page has a "Match
+your shop" % (Work it out: type your shop's price per gram once and Mizan computes it). The price
+stays automatic and follows the world price with that % added. Karats 24, 22, 21, 18, 14 and 12 are supported, in the app and in the Excel template. The
 template's Gold sheet fetches the same two sources live with `WEBSERVICE` (Excel for Windows)
 and falls back to typed values elsewhere.
 

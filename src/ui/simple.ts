@@ -31,6 +31,16 @@ export function renderSettings(root: HTMLElement, ctx: Ctx, onSignedOut: () => v
           ${["system", "light", "dark"].map((t) => `<label><input type="radio" name="theme" value="${t}"${t === theme ? " checked" : ""}><span>${t[0]!.toUpperCase() + t.slice(1)}</span></label>`).join("")}
         </div>
       </section>
+      <form class="card" id="plan-colours" novalidate>
+        <h2>Plan colours</h2>
+        <p class="muted small">On the Actual tab a line is <span class="dot-status good"></span>green when it's on plan or better,
+          <span class="dot-status warn"></span>yellow when it's a little worse, and <span class="dot-status bad"></span>red beyond that.</p>
+        <label>Yellow up to this % worse than the plan
+          <span class="suffix"><input name="warn" inputmode="decimal" value="${esc(Dec.of(ctx.data.settings.warnPct).toString())}" aria-describedby="warn-hint"><span>%</span></span></label>
+        <p class="muted small" id="warn-hint">Example with 5%: Car planned 8,000 and you paid 8,300 (3.75% more) shows yellow; 8,500 (6.25% more) shows red. 0 means anything worse is red.</p>
+        <button class="btn primary" type="submit">Save</button>
+        <p class="form-error" hidden></p>
+      </form>
       <form class="card" id="pw" novalidate>
         <h2>Change password</h2>
         <label>Current password<input type="password" name="old" autocomplete="current-password"></label>
@@ -61,6 +71,26 @@ export function renderSettings(root: HTMLElement, ctx: Ctx, onSignedOut: () => v
     localStorageSet("mizan_theme", r.value === "system" ? "" : r.value);
     applyTheme();
   }));
+
+  const pc = root.querySelector<HTMLFormElement>("#plan-colours")!;
+  pc.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const raw = (formValues(pc).warn ?? "").trim();
+    const problem = !/^\d{1,2}(\.\d{1,2})?$/.test(raw) || Number(raw) > 50 ? "Enter a number from 0 to 50 (for example 5 or 7.5)." : null;
+    formError(pc, problem);
+    if (problem) return;
+    if (Dec.of(raw).toString() === Dec.of(ctx.data.settings.warnPct).toString()) return toast("Nothing changed.", "info");
+    await busy(pc, async () => {
+      try {
+        await ctx.api.rpc("set_settings", { p_warn_threshold_pct: raw, p_gold_adjust_pct: null });
+        await ctx.reload();
+        toast(`Saved. Yellow now means up to ${Dec.of(raw).toString()}% worse than the plan.`, "ok");
+      } catch (err) {
+        if (err instanceof ApiError && err.kind === "auth") ctx.fail(err);
+        else formError(pc, err instanceof ApiError ? err.message : "Could not save.");
+      }
+    });
+  });
 
   const pw = root.querySelector<HTMLFormElement>("#pw")!;
   pw.addEventListener("submit", async (e) => {

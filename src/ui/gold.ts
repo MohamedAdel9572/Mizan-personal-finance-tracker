@@ -35,6 +35,7 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
     return;
   }
   const feed = ctx.data.goldFeed;
+  const adjPct = Dec.of(ctx.data.settings.goldAdjustPct).toString();
   const eff = effectivePrices(prices, feed);
   const holdings = toHoldings(owned);
   const summary = valueHoldings(holdings, eff, "0", today());
@@ -80,9 +81,17 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
       <div class="section-head"><h2>Price per gram</h2>
         <button type="button" class="btn ghost small" id="refresh-price">Refresh</button></div>
       <p class="muted small" id="price-hint">${feed
-        ? `Automatic: world gold $${money(feed.spotUsdOz, 2)}/oz × ${esc(Dec.of(feed.usdEgp).toFixed(2))} EGP per USD, updated ${esc(dateTime(feed.goldAt))}. Shops in Egypt are usually within a few percent of this.`
+        ? `Automatic: world gold $${money(feed.spotUsdOz, 2)}/oz × ${esc(Dec.of(feed.usdEgp).toFixed(2))} EGP per USD${adjPct !== "0" ? ` ${adjPct.startsWith("-") ? "" : "+"}${esc(adjPct)}% (your adjustment)` : ""}, updated ${esc(dateTime(feed.goldAt))}.`
         : "Automatic price not available right now."}
         Type your shop's buying price to use it instead.</p>
+      <div class="adjust-row">
+        <div><strong>Match your shop</strong>
+          <span class="muted small">Shops in Egypt are often a little above the world price. Add a % so the automatic price follows the market <em>and</em> matches your shop. 0 = world price.</span></div>
+        <div class="adjust-input">
+          <label class="suffix"><span class="sr-only">Adjustment in percent</span><input name="adjust" inputmode="decimal" value="${esc(adjPct)}" aria-describedby="price-hint"><span>%</span></label>
+          ${feed ? `<button type="button" class="btn ghost small" id="calc-adjust">Work it out</button>` : ""}
+        </div>
+      </div>
       <div class="price-rows">
         ${karats.map((k) => priceRow(k)).join("")}
       </div>
@@ -93,8 +102,7 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
     </form>
 
     <div class="card">
-      <div class="section-head gold-head"><h2>Pieces</h2>
-        ${owned.length > 1 ? `<label class="inline-select">Set all to<select id="all-karat"><option value="">Karat…</option>${KARATS.map((k) => `<option value="${k}">${k}K</option>`).join("")}</select></label>` : ""}</div>
+      <div class="section-head gold-head"><h2>Pieces</h2></div>
       <table class="table gold-table">
       <thead><tr><th>Piece</th><th class="num">Karat</th><th class="num">Grams</th><th class="num">Paid</th><th class="num">Value now</th><th class="num">Profit / loss</th><th class="num">Bought</th><th><span class="sr-only">Edit</span></th></tr></thead>
       <tbody>${owned.map((r, i) => {
@@ -109,6 +117,12 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
           <td class="num" data-label="Bought">${esc(r.purchase_date)}</td>
           <td class="edit-cell"><button class="btn ghost small" data-edit="${r.id}" aria-label="Edit ${esc(r.label)}">Edit</button></td></tr>`;
       }).join("")}</tbody>
+      <tfoot><tr class="total-row"><th scope="row">Total</th><td class="num" data-label="Pieces">${owned.length} pieces</td>
+        <td class="num" data-label="Grams">${esc(grams.toString())}</td>
+        <td class="num" data-label="Paid">${money(summary.cost)}</td>
+        <td class="num${priced ? "" : " muted"}" data-label="Value">${priced ? money(summary.market) : "needs price"}</td>
+        <td class="num ${priced ? (summary.profitMarket.isNegative() ? "neg" : "pos") : "muted"}" data-label="Profit">${priced ? signed(summary.profitMarket) : "needs price"}</td>
+        <td></td><td></td></tr></tfoot>
     </table></div>`;
 
   const save = async (row: HoldingRow, karat: number) => ctx.api.rpc("update_gold_holding", { p_id: row.id, p: {
@@ -130,24 +144,6 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
       ctx.fail(ex);
     }
   }));
-  root.querySelector<HTMLSelectElement>("#all-karat")?.addEventListener("change", async (e) => {
-    const sel = e.target as HTMLSelectElement;
-    const k = Number(sel.value);
-    if (!k) return;
-    const todo = owned.filter((r) => r.karat !== k);
-    if (!todo.length) { sel.value = ""; return toast(`All pieces are already ${k}K.`, "info"); }
-    if (!confirm(`Change ${todo.length} ${todo.length === 1 ? "piece" : "pieces"} to ${k}K?`)) { sel.value = ""; return; }
-    sel.disabled = true;
-    try {
-      for (const row of todo) await save(row, k);
-      await ctx.reload();
-      toast(`${todo.length} ${todo.length === 1 ? "piece" : "pieces"} changed to ${k}K.`, "ok");
-    } catch (ex) {
-      sel.disabled = false;
-      ctx.fail(ex);
-    }
-  });
-
   root.querySelector("#refresh-price")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget as HTMLButtonElement;
     btn.disabled = true;
@@ -169,6 +165,49 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
   }));
 
   const form = root.querySelector<HTMLFormElement>("#prices")!;
+  root.querySelector("#calc-adjust")?.addEventListener("click", () => {
+    if (!feed) return;
+    const factor = Dec.of(1).plus(Dec.of(adjPct).div(100));
+    const world = (k: Karat) => Dec.of(feed.perGram[k]).div(factor);
+    const k0: Karat = karats[0] ?? 21;
+    openDialog(`
+      <form id="calc-form" novalidate>
+        <h2>Match your shop's price</h2>
+        <p class="muted small">Type the price per gram your shop or gold app shows today. Mizan works out the % and keeps following the world price from then on.</p>
+        <div class="row-2">
+          <label>Karat<select name="k">${KARATS.map((k) => `<option value="${k}"${k === k0 ? " selected" : ""}>${k}K</option>`).join("")}</select></label>
+          <label>Shop price per gram (EGP)<input name="price" inputmode="decimal" placeholder="5920" required></label>
+        </div>
+        <p class="small" id="calc-out" aria-live="polite"></p>
+        <p class="form-error" hidden></p>
+        <div class="dialog-actions"><button type="button" class="btn ghost" data-close>Cancel</button><button type="submit" class="btn primary">Use this %</button></div>
+      </form>`, (dialog) => {
+      const f = dialog.querySelector<HTMLFormElement>("#calc-form")!;
+      const out = f.querySelector<HTMLElement>("#calc-out")!;
+      const pctFor = (): Dec | null => {
+        const raw = (f.elements.namedItem("price") as HTMLInputElement).value.trim().replace(/[,\s]/g, "");
+        if (!AMOUNT_RE.test(raw) || Dec.of(raw).isZero()) return null;
+        const k = Number((f.elements.namedItem("k") as HTMLSelectElement).value) as Karat;
+        return Dec.of(raw).div(world(k)).minus(1).times(100).round(1);
+      };
+      const update = () => {
+        const p = pctFor();
+        const k = Number((f.elements.namedItem("k") as HTMLSelectElement).value) as Karat;
+        out.textContent = p ? `World price for ${k}K is ${money(world(k))} EGP, so your shop is ${p.isNegative() ? "" : "+"}${p.toString()}%.` : "";
+      };
+      f.addEventListener("input", update);
+      f.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const p = pctFor();
+        const er = f.querySelector<HTMLElement>(".form-error")!;
+        if (!p) { er.hidden = false; er.textContent = "Enter a price per gram above 0."; return; }
+        if (p.abs().gt(20)) { er.hidden = false; er.textContent = "That is more than 20% away from the world price. Check the price and karat."; return; }
+        (form.elements.namedItem("adjust") as HTMLInputElement).value = p.toString();
+        dialog.close();
+        toast("Adjustment filled in. Press Save to keep it.", "info");
+      });
+    });
+  });
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const err = form.querySelector<HTMLElement>(".form-error")!;
@@ -183,11 +222,19 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
       }
       if ((raw || null) !== (before ? Dec.of(before).toString() : null)) changes.push({ karat: k, price: raw });
     }
+    const adjRaw = (form.elements.namedItem("adjust") as HTMLInputElement).value.trim().replace(/\s/g, "").replace(/^\+/, "") || "0";
+    if (!/^-?\d{1,2}(\.\d{1,2})?$/.test(adjRaw) || Math.abs(Number(adjRaw)) > 20) {
+      err.hidden = false;
+      err.textContent = "Adjustment must be a number from -20 to 20 (for example 1.3).";
+      return;
+    }
+    const adjChanged = Dec.of(adjRaw).toString() !== adjPct;
     err.hidden = true;
-    if (!changes.length) return toast("Nothing changed.", "info");
+    if (!changes.length && !adjChanged) return toast("Nothing changed.", "info");
     const btn = form.querySelector<HTMLButtonElement>("button[type=submit]")!;
     btn.disabled = true;
     try {
+      if (adjChanged) await ctx.api.rpc("set_settings", { p_warn_threshold_pct: null, p_gold_adjust_pct: adjRaw });
       for (const c of changes) await ctx.api.rpc("set_gold_price", { p_karat: c.karat, p_price: c.price });
       await ctx.reload();
       toast("Your prices saved.", "ok");

@@ -200,9 +200,23 @@ function editGoal(ctx: Ctx, goal: Goal | null): void {
       <label>By<input name="month" type="month" value="${esc(goal?.targetMonth ?? "2028-12")}" required></label>
       <label>Monthly savings target (EGP, optional)<input name="saving" inputmode="decimal" value="${esc(goal?.monthlySavingsTarget ? Dec.of(goal.monthlySavingsTarget).toString() : "")}"></label>
       <p class="muted small">Net worth = savings balance + gold + other assets.</p>
-      <div class="dialog-actions"><button type="button" class="btn ghost" data-close>Cancel</button><button type="submit" class="btn primary">Save goal</button></div>
+      <div class="dialog-actions">${goal ? `<button type="button" class="btn ghost danger-text" id="remove-goal">Remove goal</button><span class="spacer"></span>` : ""}<button type="button" class="btn ghost" data-close>Cancel</button><button type="submit" class="btn primary">Save goal</button></div>
     </form>`, (dialog) => {
     const form = dialog.querySelector<HTMLFormElement>("#goal-form")!;
+    dialog.querySelector("#remove-goal")?.addEventListener("click", async () => {
+      if (!confirm("Remove your goal? The dashboard goes back to showing your plan without a target. You can set a new goal any time.")) return;
+      await busy(form, async () => {
+        try {
+          await ctx.api.rpc("delete_goal");
+          dialog.close();
+          await ctx.reload();
+          toast("Goal removed.", "ok");
+        } catch (ex) {
+          if (ex instanceof ApiError && ex.kind === "auth") { dialog.close(); ctx.fail(ex); }
+          else formError(form, ex instanceof ApiError ? ex.message : "Could not remove the goal.");
+        }
+      });
+    });
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const f = formValues(form);

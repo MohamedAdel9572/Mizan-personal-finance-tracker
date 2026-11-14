@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildFeed, perGramFor } from "../goldFeed.ts";
+import { adjustFeed, buildFeed, perGramFor } from "../goldFeed.ts";
 import { Dec } from "../../engine/decimal.ts";
 import { effectivePrices } from "../gold.ts";
 
@@ -30,5 +30,15 @@ describe("automatic gold price", () => {
     expect(effectivePrices(rows, feed)[21]).toBe("5900.00");
     expect(effectivePrices([], feed)[21]).toBe("5844.22");
     expect(effectivePrices([], null)[21]).toBeUndefined();
+  });
+
+  it("adds the market adjustment to every karat", () => {
+    const feed = buildFeed({ price: 3887.6, updatedAt: "2026-11-14T01:00:00Z" }, { result: "success", rates: { EGP: 53.437041 } });
+    const adj = adjustFeed(feed, "1.3");
+    expect(adj.perGram[21]).toBe("5920.14"); // 5844.17 × 1.013 rounds to 5920.14 (your app showed 5,920)
+    expect(adj.perGram[24]).toBe(Dec.of("6679.06").times("1.013").round(2).toString());
+    expect(adj.adjustPct).toBe("1.3");
+    expect(adjustFeed(feed, "0").perGram[21]).toBe("5844.17");
+    expect(adjustFeed(feed, "-2").perGram[21]).toBe(Dec.of("5844.17").times("0.98").round(2).toString());
   });
 });

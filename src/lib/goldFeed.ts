@@ -33,6 +33,18 @@ export interface GoldFeed {
   perGram: Record<Karat, string>;
   /** true when the latest call failed and this is the last saved result */
   stale: boolean;
+  /** % the user added to match local shop prices (0 = world price × bank rate) */
+  adjustPct?: string;
+}
+
+/** Applies the user's market adjustment (e.g. +1.3 for Egyptian shop prices) to every karat. */
+export function adjustFeed(feed: GoldFeed, pct: string): GoldFeed {
+  const p = Dec.of(pct || "0");
+  if (p.isZero()) return { ...feed, adjustPct: "0" };
+  const factor = Dec.of(1).plus(p.div(100));
+  const perGram = {} as Record<Karat, string>;
+  for (const k of KARATS) perGram[k] = Dec.of(feed.perGram[k]).times(factor).round(2).toString();
+  return { ...feed, perGram, adjustPct: p.toString() };
 }
 
 export function perGramFor(spotUsdOz: Dec, usdEgp: Dec): Record<Karat, string> {
