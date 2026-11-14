@@ -12,6 +12,7 @@ import {
 } from "../lib/planDraft.ts";
 import type { VersionInfo } from "../lib/store.ts";
 import type { Ctx } from "./context.ts";
+import { renderImport } from "./importScreen.ts";
 
 // ---------------------------------------------------------------------------
 //  View: spreadsheet-like month grid (desktop) / one month at a time (mobile)
@@ -52,6 +53,7 @@ let mobileMonthIndex = -1;
 
 export function renderPlan(root: HTMLElement, ctx: Ctx): void {
   if (ctx.params[0] === "edit") return renderEditor(root, ctx, ctx.params[1] === "sample");
+  if (ctx.params[0] === "import") return renderImport(root, ctx);
 
   const { versions } = ctx.data;
   if (versions.length === 0) {
@@ -59,7 +61,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
       "No plan yet",
       "Add your income, installments and savings account. Start from scratch or load the numbers from your Excel sheet and adjust them.",
       { href: "#/plan/edit", label: "Create my plan" },
-    ) + `<p class="center"><a href="#/plan/edit/sample">Start from my Excel numbers</a></p>`;
+    ) + `<p class="center"><a href="#/plan/import">Import from Excel</a> · <a href="/Mizan-template.xlsx" download>Download template</a> · <a href="#/plan/edit/sample">Use the sample numbers</a></p>`;
     return;
   }
 
@@ -82,6 +84,8 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
       <div class="head-actions">
         <label class="sr-only" for="version">Plan version</label>
         <select id="version">${versions.map((x) => `<option value="${x.version.versionNo}"${x === info ? " selected" : ""}>${esc(versionLabel(x))}</option>`).join("")}</select>
+        <a class="btn ghost" href="#/plan/import">Import Excel</a>
+        <a class="btn ghost" href="/Mizan-template.xlsx" download>Template</a>
         <a class="btn primary" href="#/plan/edit">Edit plan</a>
       </div>
     </div>

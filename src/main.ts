@@ -6,6 +6,7 @@ import { loadData, loadProfile, type AppData } from "./lib/store.ts";
 import { renderLogin, renderSignup } from "./ui/auth.ts";
 import { renderCompare } from "./ui/compare.ts";
 import type { Ctx } from "./ui/context.ts";
+import { renderGold } from "./ui/gold.ts";
 import { renderLog } from "./ui/log.ts";
 import { discardPlanDraft, hasUnsavedPlan, renderPlan } from "./ui/plan.ts";
 import { loadingHtml, shellHtml } from "./ui/shell.ts";
@@ -22,7 +23,7 @@ const SCREENS: Record<string, (root: HTMLElement, ctx: Ctx) => void> = {
   plan: renderPlan,
   log: renderLog,
   compare: renderCompare,
-  gold: renderComingSoon("Gold", "Holdings, live EGP prices per karat and profit/loss arrive in step 5."),
+  gold: renderGold,
   history: renderComingSoon("History", "A timeline of every plan version, edit and upload arrives in step 6."),
 };
 

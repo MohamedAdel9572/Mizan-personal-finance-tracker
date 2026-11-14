@@ -12,7 +12,8 @@ goal tracking and gold holdings. Static Vite + TypeScript PWA on Vercel, Supabas
 | 2 | Calculation engine + unit tests | done |
 | 3 | Sign in/up, settings, Plan (grid + editor), Log actuals, Plan vs actual | done |
 | 4 | Dashboard, statistics | |
-| 5 | Gold price Edge Function, Excel import/export | |
+| 5 | Excel template download + import (template or your own month-grid sheet) | done early |
+| 5 | Gold live price Edge Function, Gold screen with value and profit/loss, Excel export | |
 | 6 | History, polish, responsive checks | |
 
 ## Project layout
@@ -89,6 +90,15 @@ dependencies at all.
 **Reads and actuals go through RPCs** (`get_plan_versions`, `get_actuals`, `save_checkin`,
 `add_unplanned`, `delete_unplanned`) so money always arrives as exact text and a whole month's
 check-in is saved in one transaction.
+
+**Excel import without a library.** An .xlsx file is a zip of XML. `src/lib/xlsx.ts` reads the
+zip with the browser's own `DecompressionStream` and the XML with a few regular expressions, so
+numbers arrive as their exact text and there is no extra dependency. `src/lib/importer.ts` reads
+either the Mizan template (Settings, Lines, Actuals, Unplanned, Gold) or a month-grid sheet like
+the original Excel (Income / Installments / Assets sections, months across). Every problem names
+its sheet and row, nothing is saved until you confirm, and `import_workbook()` saves the whole
+file in one transaction. Uploading the same file twice adds no duplicates and creates no new
+plan version.
 
 **Writes.** Simple tables (actuals, unplanned items, check-ins, gold holdings, goal) are
 written directly by the browser; RLS, CHECK constraints and triggers validate them.
