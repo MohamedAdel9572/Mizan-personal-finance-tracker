@@ -206,8 +206,8 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
   const today = currentMonth();
   const rateNow = [...v.rates].sort((a, b) => (a.from < b.from ? -1 : 1)).filter((r) => r.from <= today).at(-1) ?? v.rates[0];
   root.innerHTML = `
-    <div class="page-head">
-      <div>
+    <div class="page-head plan-head">
+      <div class="plan-head-left">
         <h1>Plan</h1>
         <div class="plan-meta">
           <span class="meta-chip"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>${esc(monthLabel(v.start, true))} – ${esc(monthLabel(planEnd(v), true))}<span class="muted">· ${v.horizonMonths} months</span></span>

@@ -619,3 +619,13 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
 @media (max-width: 899px) {
   .plan-actions { width: 100%; grid-template-columns: 1fr; }
 }
+
+/* left and right of the plan header share two rows: title ↔ version, chips ↔ buttons */
+@media (min-width: 900px) {
+  .plan-head { align-items: stretch; }
+  .plan-head-left { display: grid; grid-template-rows: 44px 44px; row-gap: 8px; align-items: center; }
+  .plan-head-left h1 { margin: 0; line-height: 1.1; }
+  .plan-head-left .plan-meta { margin-top: 0; }
+  .plan-actions { grid-template-rows: 44px 44px; }
+  .plan-buttons > .btn, .plan-buttons .icon-btn { min-height: 44px; }
+}
