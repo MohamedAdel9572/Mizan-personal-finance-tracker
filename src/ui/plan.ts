@@ -490,9 +490,9 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
       <legend class="sr-only">Line ${i + 1}</legend>
       <div class="item-head">
         <input class="item-name" data-i="${i}" data-f="name" value="${esc(item.name)}" placeholder="Name, e.g. Salary" aria-label="Line name" maxlength="80">
-        <button type="button" class="icon-btn danger" data-del-item="${i}" aria-label="Remove line ${esc(item.name)}">🗑</button>
+        <button type="button" class="icon-btn danger" data-del-item="${i}" aria-label="Remove line ${esc(item.name)}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4.5 7h15M10 11v6M14 11v6M6.5 7l.8 11.2A2 2 0 0 0 9.3 20h5.4a2 2 0 0 0 2-1.8L17.5 7M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
-      <div class="row-2">
+      <div class="row-2 type-row">
         <label>Type<select data-i="${i}" data-f="kind" ${item.key ? "disabled title=\"A saved line can't change type. Add a new line instead.\"" : ""}>
           ${(["income", "expense", "asset"] as const).map((k) => `<option value="${k}"${item.kind === k ? " selected" : ""}>${KIND_LABEL[k]}</option>`).join("")}
         </select></label>

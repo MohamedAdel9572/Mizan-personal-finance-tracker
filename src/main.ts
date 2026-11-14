@@ -177,6 +177,29 @@ function start(api: Api): void {
   void boot();
 }
 
+// A tab left open (phones keep them for days) never reloads by itself, because moving between
+// pages doesn't load anything new. So when you come back to Mizan, and every 10 minutes, check
+// whether a newer version is live and switch to it. Never while the plan editor has unsaved changes.
+if (import.meta.env.PROD) {
+  const mine = [...document.querySelectorAll<HTMLScriptElement>("script[src]")].map((x) => x.src).find((src) => /\/assets\/index-[^/]+\.js$/.test(src));
+  let checking = false;
+  const checkForUpdate = async () => {
+    if (!mine || checking || document.visibilityState !== "visible") return;
+    checking = true;
+    try {
+      const html = await (await fetch(`/?v=${Date.now()}`, { cache: "no-store" })).text();
+      const live = /\/assets\/index-[^"'/]+\.js/.exec(html)?.[0];
+      if (live && !mine.endsWith(live)) {
+        if (hasUnsavedPlan()) toast("A new version of Mizan is ready. Save your plan, then reload the page.", "info");
+        else location.reload();
+      }
+    } catch { /* offline: try again later */ } finally { checking = false; }
+  };
+  document.addEventListener("visibilitychange", () => void checkForUpdate());
+  window.addEventListener("focus", () => void checkForUpdate());
+  setInterval(() => void checkForUpdate(), 10 * 60 * 1000);
+}
+
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("service worker not registered", e));
