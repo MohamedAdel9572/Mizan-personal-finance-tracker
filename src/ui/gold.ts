@@ -4,7 +4,7 @@ import { valueHoldings, type Karat } from "../engine/gold.ts";
 import { effectivePrices, toHoldings, type HoldingRow, type PriceRow } from "../lib/gold.ts";
 import { getGoldFeed } from "../lib/goldFeed.ts";
 import { ApiError } from "../lib/api.ts";
-import { emptyState, esc, toast } from "../lib/dom.ts";
+import { busy, emptyState, esc, formError, formValues, openDialog, toast } from "../lib/dom.ts";
 import { dateTime, egp, money, signed } from "../lib/format.ts";
 import { loadingHtml } from "./shell.ts";
 import type { Ctx } from "./context.ts";
@@ -29,7 +29,9 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
   const owned = rows.filter((r) => !r.sold_date);
   if (owned.length === 0) {
     root.innerHTML = `<div class="page-head"><h1>Gold</h1></div>` +
-      emptyState("No gold yet", "Import your pieces from Excel (Gold sheet). Adding pieces by hand comes in step 5.", { href: "#/plan/import", label: "Import from Excel" });
+      emptyState("No gold yet", "Add your pieces one by one, or import them from Excel (Gold sheet).") +
+      `<div class="center quick-actions" style="justify-content:center"><button class="btn primary" id="add-gold">+ Add a piece</button><a class="btn ghost" href="#/plan/import">Import from Excel</a></div>`;
+    root.querySelector("#add-gold")!.addEventListener("click", () => editPiece(ctx, null));
     return;
   }
   const feed = ctx.data.goldFeed;
@@ -44,7 +46,7 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
   root.innerHTML = `
     <div class="page-head"><div><h1>Gold</h1>
       <p class="muted small">Value = grams × price per gram. The price updates automatically from the internet; you can set your shop's price instead.</p></div>
-      <div class="head-actions"><a class="btn ghost" href="#/plan/import">Import from Excel</a></div></div>
+      <div class="head-actions"><a class="btn ghost" href="#/plan/import">Import from Excel</a><button class="btn primary" id="add-gold">+ Add a piece</button></div></div>
 
     <div class="stats-grid">
       <div class="card stat"><span class="stat-label">Value now</span>
@@ -86,18 +88,61 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
       <p class="form-error" hidden></p>
     </form>
 
-    <div class="card"><table class="table gold-table">
-      <thead><tr><th>Piece</th><th class="num">Karat</th><th class="num">Grams</th><th class="num">Paid</th><th class="num">Value now</th><th class="num">Profit / loss</th><th class="num">Bought</th></tr></thead>
+    <div class="card">
+      <div class="section-head gold-head"><h2>Pieces</h2>
+        ${owned.length > 1 ? `<label class="inline-select">Set all to<select id="all-karat"><option value="">Karat…</option><option value="24">24K</option><option value="21">21K</option><option value="18">18K</option></select></label>` : ""}</div>
+      <table class="table gold-table">
+      <thead><tr><th>Piece</th><th class="num">Karat</th><th class="num">Grams</th><th class="num">Paid</th><th class="num">Value now</th><th class="num">Profit / loss</th><th class="num">Bought</th><th><span class="sr-only">Edit</span></th></tr></thead>
       <tbody>${owned.map((r, i) => {
         const v = byLabel.get(holdings[i]!);
-        return `<tr><th scope="row">${esc(r.label)}</th><td class="num" data-label="Karat">${r.karat}K</td>
+        return `<tr><th scope="row">${esc(r.label)}</th>
+          <td class="num" data-label="Karat"><select class="karat-select" data-id="${r.id}" aria-label="Karat of ${esc(r.label)}">
+            ${[24, 21, 18].map((k) => `<option value="${k}"${k === r.karat ? " selected" : ""}>${k}K</option>`).join("")}</select></td>
           <td class="num" data-label="Grams">${esc(Dec.of(r.grams).toString())}</td>
           <td class="num" data-label="Paid">${money(r.purchase_price)}</td>
           <td class="num${v ? "" : " muted"}" data-label="Value">${v ? money(v.market) : "needs price"}</td>
           <td class="num ${v ? (v.profitMarket.isNegative() ? "neg" : "pos") : "muted"}" data-label="Profit">${v ? signed(v.profitMarket) : "needs price"}</td>
-          <td class="num" data-label="Bought">${esc(r.purchase_date)}</td></tr>`;
+          <td class="num" data-label="Bought">${esc(r.purchase_date)}</td>
+          <td class="edit-cell"><button class="btn ghost small" data-edit="${r.id}" aria-label="Edit ${esc(r.label)}">Edit</button></td></tr>`;
       }).join("")}</tbody>
     </table></div>`;
+
+  const save = async (row: HoldingRow, karat: number) => ctx.api.rpc("update_gold_holding", { p_id: row.id, p: {
+    label: row.label, karat, grams: row.grams, price: row.purchase_price, date: row.purchase_date } });
+  root.querySelector("#add-gold")?.addEventListener("click", () => editPiece(ctx, null));
+  root.querySelectorAll<HTMLButtonElement>("[data-edit]").forEach((b) => b.addEventListener("click", () =>
+    editPiece(ctx, owned.find((r) => r.id === Number(b.dataset.edit)) ?? null)));
+  root.querySelectorAll<HTMLSelectElement>(".karat-select").forEach((sel) => sel.addEventListener("change", async () => {
+    const row = owned.find((r) => r.id === Number(sel.dataset.id));
+    if (!row) return;
+    sel.disabled = true;
+    try {
+      await save(row, Number(sel.value));
+      await ctx.reload();
+      toast(`${row.label} is now ${sel.value}K.`, "ok");
+    } catch (ex) {
+      sel.disabled = false;
+      sel.value = String(row.karat);
+      ctx.fail(ex);
+    }
+  }));
+  root.querySelector<HTMLSelectElement>("#all-karat")?.addEventListener("change", async (e) => {
+    const sel = e.target as HTMLSelectElement;
+    const k = Number(sel.value);
+    if (!k) return;
+    const todo = owned.filter((r) => r.karat !== k);
+    if (!todo.length) { sel.value = ""; return toast(`All pieces are already ${k}K.`, "info"); }
+    if (!confirm(`Change ${todo.length} ${todo.length === 1 ? "piece" : "pieces"} to ${k}K?`)) { sel.value = ""; return; }
+    sel.disabled = true;
+    try {
+      for (const row of todo) await save(row, k);
+      await ctx.reload();
+      toast(`${todo.length} ${todo.length === 1 ? "piece" : "pieces"} changed to ${k}K.`, "ok");
+    } catch (ex) {
+      sel.disabled = false;
+      ctx.fail(ex);
+    }
+  });
 
   root.querySelector("#refresh-price")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget as HTMLButtonElement;
@@ -148,5 +193,68 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
       err.hidden = false;
       err.textContent = ex instanceof ApiError ? ex.message : "Could not save the prices.";
     }
+  });
+}
+
+/** Add a piece (row = null) or edit one, with delete. */
+function editPiece(ctx: Ctx, row: HoldingRow | null): void {
+  const t = today();
+  openDialog(`
+    <form id="piece-form" novalidate>
+      <h2>${row ? "Edit piece" : "Add a gold piece"}</h2>
+      <label>Name<input name="label" maxlength="80" value="${esc(row?.label ?? "")}" placeholder="e.g. BTC 2.5g bar" required></label>
+      <div class="row-2">
+        <label>Karat<select name="karat">${[24, 21, 18].map((k) => `<option value="${k}"${k === (row?.karat ?? 21) ? " selected" : ""}>${k}K</option>`).join("")}</select></label>
+        <label>Grams<input name="grams" inputmode="decimal" value="${esc(row ? Dec.of(row.grams).toString() : "")}" placeholder="2.5" required></label>
+      </div>
+      <div class="row-2">
+        <label>Paid (total EGP)<input name="price" inputmode="decimal" value="${esc(row ? Dec.of(row.purchase_price).toString() : "")}" placeholder="12510" required></label>
+        <label>Bought on<input name="date" type="date" max="${t}" value="${esc(row?.purchase_date ?? t)}" required></label>
+      </div>
+      <div class="dialog-actions">
+        ${row ? `<button type="button" class="btn ghost danger-text" id="delete-piece">Delete</button><span class="spacer"></span>` : ""}
+        <button type="button" class="btn ghost" data-close>Cancel</button>
+        <button type="submit" class="btn primary">${row ? "Save" : "Add"}</button>
+      </div>
+    </form>`, (dialog) => {
+    const form = dialog.querySelector<HTMLFormElement>("#piece-form")!;
+    if (!row) form.querySelector<HTMLInputElement>("input[name=label]")?.focus();
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = formValues(form);
+      const grams = (f.grams ?? "").replace(/[,\s]/g, "");
+      const price = (f.price ?? "").replace(/[,\s]/g, "");
+      const problem = !(f.label ?? "").trim() ? "Give the piece a name."
+        : !/^\d{1,7}(\.\d{1,3})?$/.test(grams) || Dec.of(grams).isZero() ? "Grams must be more than 0 (max 3 decimals)."
+        : !/^\d{1,14}(\.\d{1,2})?$/.test(price) ? "Paid must be a number of 0 or more."
+        : !f.date || f.date > t ? "Pick a purchase date that isn't in the future." : null;
+      formError(form, problem);
+      if (problem) return;
+      await busy(form, async () => {
+        try {
+          const p = { label: (f.label ?? "").trim(), karat: Number(f.karat), grams, price, date: f.date };
+          if (row) await ctx.api.rpc("update_gold_holding", { p_id: row.id, p });
+          else await ctx.api.rpc("add_gold_holding", { p });
+          dialog.close();
+          await ctx.reload();
+          toast(row ? "Piece saved." : "Piece added.", "ok");
+        } catch (ex) {
+          if (ex instanceof ApiError && ex.kind === "auth") { dialog.close(); ctx.fail(ex); }
+          else formError(form, ex instanceof ApiError ? ex.message : "Could not save the piece.");
+        }
+      });
+    });
+    dialog.querySelector("#delete-piece")?.addEventListener("click", async () => {
+      if (!row || !confirm(`Delete "${row.label}"? This can't be undone.`)) return;
+      try {
+        await ctx.api.rpc("delete_gold_holding", { p_id: row.id });
+        dialog.close();
+        await ctx.reload();
+        toast("Piece deleted.", "ok");
+      } catch (ex) {
+        if (ex instanceof ApiError && ex.kind === "auth") { dialog.close(); ctx.fail(ex); }
+        else formError(form, ex instanceof ApiError ? ex.message : "Could not delete the piece.");
+      }
+    });
   });
 }

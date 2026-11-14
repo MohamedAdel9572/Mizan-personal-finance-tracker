@@ -421,3 +421,12 @@ select option, select optgroup { background-color: var(--surface); color: var(--
 .price-input { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
 .price-input label { margin: 0; }
 @media (max-width: 640px) { .price-row { grid-template-columns: 1fr; } }
+
+.gold-head { margin-bottom: 4px; }
+.inline-select { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; }
+.inline-select select { width: auto; margin: 0; }
+.karat-select { width: auto; min-width: 84px; margin: 0 0 0 auto; min-height: 36px; padding: 4px 8px; }
+.edit-cell { text-align: right; width: 1%; }
+.dialog-actions .spacer { flex: 1; }
+.danger-text { color: var(--bad); }
+@media (max-width: 640px) { .gold-table .edit-cell { grid-column: 1 / -1; text-align: left; } .karat-select { margin: 0; } }
