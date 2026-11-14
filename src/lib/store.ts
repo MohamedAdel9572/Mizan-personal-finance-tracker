@@ -13,6 +13,11 @@ import { valueHoldings } from "../engine/gold.ts";
 import { effectivePrices, toHoldings, type HoldingRow, type PriceRow } from "./gold.ts";
 import { adjustFeed, getGoldFeed, type GoldFeed } from "./goldFeed.ts";
 
+/** The plan line that means "my gold" (English or Arabic name). */
+export function isGoldLine(name: string): boolean {
+  return /gold|ذهب/i.test(name);
+}
+
 export interface Profile {
   id: string;
   full_name: string;
@@ -22,7 +27,10 @@ export interface Profile {
 
 export interface VersionInfo {
   id: number;
+  /** what the screens show: the Gold asset line follows your real gold value (see goldAuto) */
   version: PlanVersion;
+  /** exactly as saved; the plan editor and the import comparison use this */
+  rawVersion: PlanVersion;
   note: string;
   createdAt: string;
 }
@@ -37,7 +45,7 @@ export interface UnplannedRow {
 }
 
 interface ActualsRow {
-  checkins: { month: string; savings_balance: string | null; note: string }[];
+  checkins: { month: string; savings_balance: string | null; note: string; gold_value?: string | null }[];
   entries: { month: string; item_key: string; amount: string; note: string }[];
   unplanned: UnplannedRow[];
 }
@@ -56,6 +64,12 @@ export interface AppData {
   /** gold at today's price, when every karat you own has a price */
   goldValue: Dec | null;
   goldFeed: GoldFeed | null;
+  /** true when the plan's Gold line is replaced by the value of your gold pieces */
+  goldAuto: boolean;
+  /** gold value per logged month: saved when you logged it, else today's value */
+  goldByMonth: Map<string, Dec>;
+  /** value of the pieces owned at the end of a month, at today's price (null if a price is missing) */
+  goldValueAt: (month: string) => Dec | null;
   goal: Goal | null;
   settings: Settings;
 }
@@ -87,12 +101,32 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
   const rawFeed: GoldFeed | null = owned.length ? await getGoldFeed().catch(() => null) : null;
   const feed = rawFeed ? adjustFeed(rawFeed, settings.goldAdjustPct) : null;
 
-  const versions: VersionInfo[] = versionRows.map((r) => ({
-    id: r.id,
-    version: versionFromRow(r),
-    note: r.note,
-    createdAt: r.created_at,
-  }));
+  // Gold value now (today's price) and at any month end
+  const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date());
+  const eff = effectivePrices(priceRows, feed);
+  const allHoldings = toHoldings(goldRows);
+  const goldValueAt = (month: string): Dec | null => {
+    if (!goldRows.length) return null;
+    const [y, m] = month.split("-").map(Number) as [number, number];
+    const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    const s = valueHoldings(allHoldings, eff, "0", end < todayIso ? end : todayIso);
+    return s.missingPrices.length ? null : s.market;
+  };
+  const gold = owned.length ? valueHoldings(toHoldings(owned), eff, "0", todayIso) : null;
+  const goldValue = gold && gold.missingPrices.length === 0 ? gold.market : null;
+  const goldAuto = goldValue !== null;
+
+  // The plan's Gold asset line shows today's gold value instead of a typed number
+  const withGold = (v: PlanVersion): PlanVersion => !goldAuto ? v : {
+    ...v,
+    items: v.items.map((it) => it.kind === "asset" && isGoldLine(it.name)
+      ? { ...it, recurrence: "recurring" as const, amounts: [{ month: it.start, amount: goldValue!.toString() }] }
+      : it),
+  };
+  const versions: VersionInfo[] = versionRows.map((r) => {
+    const raw = versionFromRow(r);
+    return { id: r.id, version: withGold(raw), rawVersion: raw, note: r.note, createdAt: r.created_at };
+  });
   const timeline = versions.length ? new PlanTimeline(versions.map((v) => v.version)) : null;
 
   const entries = new Map<string, Map<string, string>>();
@@ -102,21 +136,21 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
     entries.set(e.month, m);
   }
 
-  // Gold at today's price replaces the planned gold value in the latest logged month's net worth
-  const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date());
-  const gold = owned.length ? valueHoldings(toHoldings(owned), effectivePrices(priceRows, feed), "0", todayIso) : null;
-  const goldValue = gold && gold.missingPrices.length === 0 ? gold.market : null;
+  // Logged months: gold saved with the check-in (the price of that day), else today's value
   const assetValues: Record<string, string> = {};
-  const lastChecked = actualRows.checkins.map((c) => c.month).sort().at(-1);
-  if (goldValue && lastChecked && timeline) {
-    const planned = timeline.planned(lastChecked);
-    const version = timeline.versionFor(lastChecked);
-    if (planned && version) {
+  const goldByMonth = new Map<string, Dec>();
+  if (goldAuto && timeline) {
+    for (const c of actualRows.checkins) {
+      const g = c.gold_value ? Dec.of(c.gold_value) : goldValue!;
+      const planned = timeline.planned(c.month);
+      const version = timeline.versionFor(c.month);
+      if (!planned || !version) continue;
       let other = Dec.ZERO;
       for (const item of version.items) {
-        if (item.kind === "asset" && !/gold|ذهب/i.test(item.name)) other = other.plus(planned.lines.get(item.key) ?? Dec.ZERO);
+        if (item.kind === "asset" && !isGoldLine(item.name)) other = other.plus(planned.lines.get(item.key) ?? Dec.ZERO);
       }
-      assetValues[lastChecked] = goldValue.plus(other).toString();
+      goldByMonth.set(c.month, g);
+      assetValues[c.month] = g.plus(other).toString();
     }
   }
 
@@ -140,6 +174,9 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
     comparisons,
     goldValue,
     goldFeed: feed,
+    goldAuto,
+    goldByMonth,
+    goldValueAt,
     settings,
     goal: goalRow ? { targetAmount: goalRow.target_amount, targetMonth: goalRow.target_month, monthlySavingsTarget: goalRow.monthly_savings_target } : null,
   };

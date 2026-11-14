@@ -67,7 +67,7 @@ export function renderImport(root: HTMLElement, ctx: Ctx): void {
     box.innerHTML = `<div class="loading"><span class="spinner"></span>Reading ${esc(file.name)}…</div>`;
     try {
       const sheets = await readXlsx(await file.arrayBuffer());
-      const latest = ctx.data.versions[0]?.version;
+      const latest = ctx.data.versions[0]?.rawVersion;
       const parsed = parseImport(sheets, { today: todayCairo(), existingLines: latest?.items.map((i) => i.name) ?? [] });
       if (parsed.draft) attachKeys(parsed.draft, latest);
       renderPreview(box, ctx, parsed, file.name, latest);

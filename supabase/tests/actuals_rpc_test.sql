@@ -32,6 +32,18 @@ select test.eq((public.get_actuals()#>'{checkins,0,savings_balance}')::text, 'nu
 select test.eq((select count(*) from public.audit_events where entity = 'actual_entries')::text, '3',
                'unchanged lines are not re-logged in History (2 inserts + 1 edit)');
 
+\echo '--- gold value with a check-in (013)'
+select test.eq((public.get_actuals()#>'{checkins,0,gold_value}')::text, 'null', 'no gold value yet');
+select public.save_checkin('2026-07',
+  '[{"item_key": "11111111-1111-4111-8111-111111111111", "amount": "28000"},
+    {"item_key": "22222222-2222-4222-8222-222222222222", "amount": "6000"}]', '', 'first month', '103,600');
+select test.eq(public.get_actuals()#>>'{checkins,0,gold_value}', '103600.00', 'gold value saved (commas ok)');
+select public.save_checkin('2026-07',
+  '[{"item_key": "11111111-1111-4111-8111-111111111111", "amount": "28000"},
+    {"item_key": "22222222-2222-4222-8222-222222222222", "amount": "6000"}]', '', 'first month');
+select test.eq(public.get_actuals()#>>'{checkins,0,gold_value}', '103600.00', 'saving without a gold value keeps the old one');
+select test.throws($$select public.save_checkin('2026-07', '[]', '', '', '-5')$$, '%negative%', 'negative gold value rejected');
+
 select test.throws($$select public.save_checkin('2026-08',
   '[{"item_key": "11111111-1111-4111-8111-111111111111", "amount": "28000"},
     {"item_key": "22222222-2222-4222-8222-222222222222", "amount": "-1"}]')$$, '%negative%', 'negative amount rejected');

@@ -114,6 +114,12 @@ Refreshed every 30 minutes and cached in the browser; a price you type on the Go
 Karats 24, 22, 21, 18, 14 and 12 are supported, in the app and in the Excel template, whose Gold sheet
 fetches the same sources with `WEBSERVICE` (Excel for Windows) and falls back to typed values elsewhere.
 
+**Gold in the plan is automatic.** When you own gold pieces with a price, the plan's Gold asset line
+(named Gold or ذهب) shows their value at today's Egyptian shop price in every month instead of the
+typed amount, so net worth follows the market. Each logged month saves the gold value of that day
+(`monthly_checkins.gold_value`, migration 013), so past months keep the value they had. Saved plan
+versions are not changed: the editor still shows the typed amount, used only when you have no gold.
+
 **One Plan page, two tabs.** "Plan" shows the expected numbers only. "Actual" shows logged months
 with a coloured dot (empty months are not logged yet). The dot says
 how it went (green on plan or better, yellow up to 5% behind, red further behind) and hovering

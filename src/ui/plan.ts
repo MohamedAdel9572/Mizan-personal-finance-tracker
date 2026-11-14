@@ -11,7 +11,7 @@ import {
   defaultEffective, draftFromVersion, draftToPayload, emptyDraft, lastPlanMonth, newItem, validateDraft,
   type Draft, type DraftItem,
 } from "../lib/planDraft.ts";
-import type { VersionInfo } from "../lib/store.ts";
+import { isGoldLine, type VersionInfo } from "../lib/store.ts";
 import type { Ctx } from "./context.ts";
 import { renderImport } from "./importScreen.ts";
 import { LOG_BASE, planReturn, renderLog } from "./log.ts";
@@ -44,6 +44,8 @@ interface GridRow {
   actual?: (month: Month) => Actual | null;
   /** value shown on the Actual tab for rows without a plan comparison (assets) */
   logged?: (month: Month) => Dec | null;
+  /** small tag after the label, e.g. "automatic" for the Gold line */
+  tag?: { text: string; title: string };
 }
 
 function gridRows(v: PlanVersion, ctx: Ctx): { section: string; rows: GridRow[] }[] {
@@ -59,10 +61,16 @@ function gridRows(v: PlanVersion, ctx: Ctx): { section: string; rows: GridRow[] 
     const t = pick(c);
     return { planned: t.planned, actual: t.actual, effect: higherIsBetter ? t.gap : t.gap.neg(), unit };
   };
-  const line = (key: string, name: string, withActual: boolean): GridRow => ({
-    label: name, cls: "line", values: (r) => r.lines.get(key) ?? Dec.ZERO,
-    ...(withActual ? { actual: lineActual(key) } : { logged: (m: Month) => (cmp.has(m) ? act.get(m)?.lines.get(key) ?? null : null) }),
-  });
+  const line = (key: string, name: string, withActual: boolean): GridRow => {
+    const autoGold = !withActual && ctx.data.goldAuto && isGoldLine(name);
+    return {
+      label: name, cls: "line", values: (r) => r.lines.get(key) ?? Dec.ZERO,
+      ...(withActual ? { actual: lineActual(key) }
+        : autoGold ? { logged: (m: Month) => (cmp.has(m) ? ctx.data.goldByMonth.get(m) ?? null : null) }
+        : { logged: (m: Month) => (cmp.has(m) ? act.get(m)?.lines.get(key) ?? null : null) }),
+      ...(autoGold ? { tag: { text: "automatic", title: "Value of your gold pieces at today's Egyptian shop price (Gold page). Logged months keep the value from the day you logged them." } } : {}),
+    };
+  };
   const of = (kind: string) => v.items.filter((i) => i.kind === kind).map((i) => line(i.key, i.name, kind !== "asset"));
   const unplanned = (kind: "income" | "expense"): GridRow[] => {
     const items = ctx.data.unplanned.filter((u) => u.kind === kind);
@@ -242,7 +250,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
         <tbody>
           ${groups.map((g) => `
             <tr class="section"><th class="sticky-col" scope="rowgroup" colspan="1">${esc(g.section)}</th><td colspan="${rows.length}"></td></tr>
-            ${g.rows.map((row) => `<tr class="${row.cls}"><th class="sticky-col" scope="row">${esc(row.label)}</th>${rows.map((r) =>
+            ${g.rows.map((row) => `<tr class="${row.cls}"><th class="sticky-col" scope="row">${esc(row.label)}${row.tag ? ` <span class="row-tag" title="${esc(row.tag.title)}">${esc(row.tag.text)}</span>` : ""}</th>${rows.map((r) =>
               tab === "plan" ? cell(row.values(r), row.cls.includes("signed") || row.cls === "grand", r.month, null)
                 : actualCell(row, r.month, row.cls.includes("signed") || row.cls === "grand", logged.has(r.month))).join("")}</tr>`).join("")}
           `).join("")}
@@ -267,7 +275,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
             if (row.cls.startsWith("line") && d.isZero()) return "";
             const neg = d.round(0).isNegative();
             const st = tab === "actual" && a ? statusOf(a.effect, a.planned) : null;
-            return `<div class="kv ${row.cls}"><span>${esc(row.label)}${st && a ? `<span class="kv-actual muted small">plan ${money(a.planned)} · ${esc(gapWords(a))}</span>` : ""}</span>
+            return `<div class="kv ${row.cls}"><span>${esc(row.label)}${row.tag ? ` <span class="row-tag">${esc(row.tag.text)}</span>` : ""}${st && a ? `<span class="kv-actual muted small">plan ${money(a.planned)} · ${esc(gapWords(a))}</span>` : ""}</span>
               <span class="num${neg ? " neg" : ""}">${st ? `<span class="dot-status ${st}" aria-label="${esc(STATUS_WORD[st])}"></span>` : ""}${d.round(0).isZero() ? "–" : money(d)}</span></div>`;
           }).join("")}
         </div>`).join("")}
@@ -434,7 +442,7 @@ export function discardPlanDraft(): void {
 const KIND_LABEL = { income: "Income", expense: "Installment / expense", asset: "Asset (gold, other)" } as const;
 
 function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
-  const latest = ctx.data.versions[0]?.version;
+  const latest = ctx.data.versions[0]?.rawVersion;
   if (!draft) {
     draft = latest ? draftFromVersion(latest) : sample ? draftFromVersion({ ...SEED_PLAN }) : emptyDraft(currentMonth());
     if (sample && !latest) draft.items.forEach((i) => (i.key = "")); // new lines get real keys from the database
@@ -471,6 +479,7 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
         <label>From<input type="month" data-i="${i}" data-f="start" value="${esc(item.start)}"></label>
         <label>Until <span class="muted small">(empty = no end)</span><input type="month" data-i="${i}" data-f="end" value="${esc(item.end)}"></label>
       </div>` : ""}
+      ${item.kind === "asset" && isGoldLine(item.name) ? `<p class="notice small">Automatic: this line shows the value of your pieces on the Gold page at today's Egyptian shop price. The amount below is only used if you have no gold pieces.</p>` : ""}
       <div class="amounts">
         <div class="amount-head muted small"><span>${item.recurrence === "recurring" ? "Amount from month" : "Month"}</span><span>${item.kind === "asset" ? "Value" : "Amount"} (EGP)</span><span></span></div>
         ${item.amounts.map((a, j) => amountRow(item, i, a, j)).join("")}

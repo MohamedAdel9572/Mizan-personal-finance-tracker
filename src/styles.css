@@ -528,3 +528,5 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
 .btn.danger-text:hover { background: var(--bad-soft); }
 .dialog-actions .spacer { flex: 1; }
 #plan-colours .dot-status { margin: 0 3px 0 4px; }
+
+.row-tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: .68rem; font-weight: 600; letter-spacing: .02em; color: var(--accent); background: var(--accent-soft); vertical-align: middle; cursor: help; }

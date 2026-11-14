@@ -169,6 +169,8 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
       return;
     }
     formError(form, null);
+    // gold value of that month (pieces owned by then, at today's price) is saved with the month
+    const goldNow = ctx.data.goldAuto ? ctx.data.goldValueAt(month) : null;
     await busy(form, async () => {
       try {
         await ctx.api.rpc("save_checkin", {
@@ -176,6 +178,14 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
           p_entries: inputs.map((i) => ({ item_key: i.name.slice(5), amount: cleanAmount(i.value) })),
           p_savings_balance: balance || null,
           p_note: (f.note ?? "").trim(),
+          ...(goldNow ? { p_gold_value: goldNow.round(2).toString() } : {}),
+        }).catch(async (err) => {
+          // database without migration 013 doesn't know p_gold_value yet: save without it
+          if (goldNow && err instanceof ApiError && err.code === "PGRST202") {
+            return ctx.api.rpc("save_checkin", { p_month: month, p_entries: inputs.map((i) => ({ item_key: i.name.slice(5), amount: cleanAmount(i.value) })),
+              p_savings_balance: balance || null, p_note: (f.note ?? "").trim() });
+          }
+          throw err;
         });
         await ctx.reload();
         toast(`${monthLabel(month, true)} saved.`, "ok");
