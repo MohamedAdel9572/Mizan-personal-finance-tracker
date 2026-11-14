@@ -575,7 +575,9 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
 @media (min-width: 900px) { .grid-split.desktop-only { display: flex !important; } }
 
 /* gold: the three totals stacked on the left, price per gram on the right */
-.gold-top { display: grid; gap: 16px; margin-bottom: 16px; grid-template-columns: 1fr; align-items: start; }
+.gold-top { display: grid; gap: 16px; margin-bottom: 16px; grid-template-columns: 1fr; align-items: stretch; }
+.gold-side { display: flex; flex-direction: column; }
+.gold-side .price-card { flex: 1; }
 .gold-stats { display: grid; gap: 12px; grid-template-columns: 1fr; }
 @media (min-width: 640px) and (max-width: 999px) { .gold-stats { grid-template-columns: repeat(3, 1fr); } }
 .gold-side .price-card { max-width: none; margin-bottom: 0; }
