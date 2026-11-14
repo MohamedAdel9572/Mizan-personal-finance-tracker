@@ -61,8 +61,6 @@ export function renderSignup(root: HTMLElement, api: Api, onSignedIn: () => void
       <label>Password <span class="muted small">(8 or more characters)</span>
         <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required></label>
       <label>Repeat password<input name="password2" type="password" autocomplete="new-password" required></label>
-      <label>Sign-up code <span class="muted small">(from the owner)</span>
-        <input name="code" autocomplete="off"></label>
       <button class="btn primary block" type="submit">Create account</button>
     </form>
     <p class="center small">Already registered? <a href="#/login">Sign in</a></p>`);
@@ -84,12 +82,12 @@ export function renderSignup(root: HTMLElement, api: Api, onSignedIn: () => void
           p_full_name: (f.full_name ?? "").trim(),
           p_mobile: normMobile(f.mobile ?? ""),
           p_password: f.password,
-          p_signup_code: (f.code ?? "").trim() || null,
         });
         setToken(token);
         onSignedIn();
       } catch (err) {
-        formError(form, err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+        const msg = err instanceof ApiError ? err.message : "Something went wrong. Please try again.";
+        formError(form, msg.startsWith("Sign-up is closed") ? "Sign-up is closed." : msg);
       }
     });
   });
