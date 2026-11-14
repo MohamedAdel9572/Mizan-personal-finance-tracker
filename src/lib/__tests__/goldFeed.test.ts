@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adjustFeed, buildFeed, perGramFor } from "../goldFeed.ts";
+import { adjustFeed, buildFeed, buildLocalFeed, localBuyPrice, perGramFor } from "../goldFeed.ts";
 import { Dec } from "../../engine/decimal.ts";
 import { effectivePrices } from "../gold.ts";
 
@@ -40,5 +40,41 @@ describe("automatic gold price", () => {
     expect(adj.adjustPct).toBe("1.3");
     expect(adjustFeed(feed, "0").perGram[21]).toBe("5844.17");
     expect(adjustFeed(feed, "-2").perGram[21]).toBe(Dec.of("5844.17").times("0.98").round(2).toString());
+  });
+
+  // Daleelak answers of 14 Nov 2026 (trimmed): eDahab buy 6,766 / 5,920 / 5,074
+  const at = "2026-11-14T11:57:00.000Z";
+  const asset = (k: number, sellers: { seller: string; buy: number }[]) => ({ assets: [{ id: `GOLD${k}K-EGP`, unit: "EGP/g", observedAt: at, sellers }] });
+  const d24 = asset(24, [{ seller: "BTC", buy: 6749.71 }, { seller: "eDahab", buy: 6766 }, { seller: "iSagha", buy: 6782.75 }]);
+  const d21 = asset(21, [{ seller: "BTC", buy: 5906.7 }, { seller: "eDahab", buy: 5920 }, { seller: "Goldady", buy: 5926.5 }, { seller: "iSagha", buy: 5935 }]);
+  const d18 = asset(18, [{ seller: "eDahab", buy: 5074 }, { seller: "iSagha", buy: 5087.25 }]);
+
+  it("uses the Egyptian shop buying price from eDahab", () => {
+    const f = buildLocalFeed({ 24: d24, 21: d21, 18: d18 }, null, new Date(at));
+    expect(f.source).toBe("local");
+    expect(f.sourceName).toBe("eDahab");
+    expect(f.perGram[21]).toBe("5920");
+    expect(f.perGram[24]).toBe("6766");
+    expect(f.perGram[18]).toBe("5074");
+    expect(f.perGram[22]).toBe("6202.17"); // 6766 × 22/24
+    expect(f.perGram[14]).toBe("3946.44"); // 5074 × 14/18
+    expect(f.perGram[12]).toBe("3382.67"); // 5074 × 12/18
+    // 17.5 g of 21K = 103,600, as in the eDahab app
+    expect(Dec.of(f.perGram[21]).times("17.5").toString()).toBe("103600");
+  });
+
+  it("falls back to the dealers' average when eDahab is missing, and rejects bad answers", () => {
+    const noEdahab = asset(21, [{ seller: "BTC", buy: 5906.7 }, { seller: "iSagha", buy: 5935 }]);
+    const p = localBuyPrice(noEdahab, 21);
+    expect(p.price.toString()).toBe("5920.85");
+    expect(p.seller).toBe("average of 2 dealers");
+    expect(() => localBuyPrice({ assets: [] }, 21)).toThrow();
+    expect(() => localBuyPrice(asset(21, [{ seller: "x", buy: -1 }]), 21)).toThrow();
+    expect(() => localBuyPrice(null, 21)).toThrow();
+  });
+
+  it("does not add the world-price % to the shop price", () => {
+    const f = buildLocalFeed({ 24: d24, 21: d21, 18: d18 }, null);
+    expect(adjustFeed(f, "1.3").perGram[21]).toBe("5920");
   });
 });

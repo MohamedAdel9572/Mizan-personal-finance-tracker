@@ -62,7 +62,7 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
 
   root.innerHTML = `
     <div class="page-head"><div><h1>Gold</h1>
-      <p class="muted small">Value = grams × price per gram. The price updates automatically from the internet; you can set your shop's price instead.</p></div>
+      <p class="muted small">Value = grams × today's Egyptian shop buying price per gram, updated automatically every 30 minutes.</p></div>
       <div class="head-actions"><a class="btn ghost" href="#/plan/import">Import from Excel</a><button class="btn primary" id="add-gold">+ Add a piece</button></div></div>
 
     <div class="stats-grid">
@@ -80,18 +80,19 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
     <form class="card price-card${priced ? "" : " needs-price"}" id="prices" novalidate>
       <div class="section-head"><h2>Price per gram</h2>
         <button type="button" class="btn ghost small" id="refresh-price">Refresh</button></div>
-      <p class="muted small" id="price-hint">${feed
-        ? `Automatic: world gold $${money(feed.spotUsdOz, 2)}/oz × ${esc(Dec.of(feed.usdEgp).toFixed(2))} EGP per USD${adjPct !== "0" ? ` ${adjPct.startsWith("-") ? "" : "+"}${esc(adjPct)}% (your adjustment)` : ""}, updated ${esc(dateTime(feed.goldAt))}.`
-        : "Automatic price not available right now."}
-        Type your shop's buying price to use it instead.</p>
-      <div class="adjust-row">
+      <p class="muted small" id="price-hint">${!feed ? "Automatic price not available right now."
+        : feed.source === "local"
+        ? `Automatic: Egyptian shop buying price (what a shop pays you today, no workmanship) from <strong>${esc(feed.sourceName ?? "Egyptian dealers")}</strong>, updated ${esc(dateTime(feed.goldAt))}. Source: <a href="https://getdaleelak.com" target="_blank" rel="noopener">Daleelak</a>.`
+        : `Automatic: the Egyptian shop price couldn't be loaded, so this is the world price: $${money(feed.spotUsdOz, 2)}/oz × ${esc(Dec.of(feed.usdEgp).toFixed(2))} EGP per USD${adjPct !== "0" ? ` ${adjPct.startsWith("-") ? "" : "+"}${esc(adjPct)}% (your adjustment)` : ""}, updated ${esc(dateTime(feed.goldAt))}.`}
+        Type a price below only if you want to use a different one.</p>
+      ${feed?.source === "local" ? `<input type="hidden" name="adjust" value="${esc(adjPct)}">` : `<div class="adjust-row">
         <div><strong>Match your shop</strong>
-          <span class="muted small">Shops in Egypt are often a little above the world price. Add a % so the automatic price follows the market <em>and</em> matches your shop. 0 = world price.</span></div>
+          <span class="muted small">Used only while the Egyptian shop price can't be loaded. Shops in Egypt are usually a little above the world price; this % is added to it. 0 = world price.</span></div>
         <div class="adjust-input">
           <label class="suffix"><span class="sr-only">Adjustment in percent</span><input name="adjust" inputmode="decimal" value="${esc(adjPct)}" aria-describedby="price-hint"><span>%</span></label>
           ${feed ? `<button type="button" class="btn ghost small" id="calc-adjust">Work it out</button>` : ""}
         </div>
-      </div>
+      </div>`}
       <div class="price-rows">
         ${karats.map((k) => priceRow(k)).join("")}
       </div>

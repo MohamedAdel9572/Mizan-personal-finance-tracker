@@ -103,18 +103,16 @@ its sheet and row, nothing is saved until you confirm, and `import_workbook()` s
 file in one transaction. Uploading the same file twice adds no duplicates and creates no new
 plan version.
 
-**Automatic gold price, fetched by the browser.** Free sources with no API key:
-`api.gold-api.com/price/XAU` (USD per ounce) and `open.er-api.com/v6/latest/USD` (EGP rate).
-Price per gram = USD/oz / 31.1034768 x karat/24 x EGP per USD, refreshed every 30 minutes and
-cached in the browser so a failed call still shows the last price with a warning. The spec asked
-for a server-side Edge Function to keep the API key secret; with no key there is nothing to hide,
-so this is simpler and has no server to deploy. Egyptian shop prices are usually within a few
-percent of this; a price you type on the Gold page always wins.
-Shops in Egypt usually sit a little above world price × bank rate, so the Gold page has a "Match
-your shop" % (Work it out: type your shop's price per gram once and Mizan computes it). The price
-stays automatic and follows the world price with that % added. Karats 24, 22, 21, 18, 14 and 12 are supported, in the app and in the Excel template. The
-template's Gold sheet fetches the same two sources live with `WEBSERVICE` (Excel for Windows)
-and falls back to typed values elsewhere.
+**Automatic gold price, fetched by the browser.** First choice is the Egyptian shop buying price
+(what a shop pays you today, no workmanship) from [Daleelak](https://getdaleelak.com)'s free feed of
+licensed Egyptian dealers (`/api/v1/feed.json?asset=gold-21k`, no key, CORS open, "free to use, a link
+back is appreciated"). Mizan uses eDahab's buying price, the same number the eDahab app values gold
+with, or the average of the other dealers when eDahab is missing. 22K comes from 24K and 14K/12K from
+18K by purity. If the feed can't be reached, Mizan falls back to the world price
+(`api.gold-api.com` USD/oz × `open.er-api.com` EGP rate) plus an optional "Match your shop" %.
+Refreshed every 30 minutes and cached in the browser; a price you type on the Gold page always wins.
+Karats 24, 22, 21, 18, 14 and 12 are supported, in the app and in the Excel template, whose Gold sheet
+fetches the same sources with `WEBSERVICE` (Excel for Windows) and falls back to typed values elsewhere.
 
 **One Plan page, two tabs.** "Plan" shows the expected numbers only. "Actual" shows logged months
 with a coloured dot (empty months are not logged yet). The dot says
