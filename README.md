@@ -117,7 +117,7 @@ and falls back to typed values elsewhere.
 **One Plan page, two tabs.** "Plan" shows the expected numbers only. "Actual" shows logged months
 with a coloured dot (empty months are not logged yet). The dot says
 how it went (green on plan or better, yellow up to 5% behind, red further behind) and hovering
-or focusing a cell shows the actual. Logging a month opens over the grid (`#/plan/log/<month>`).
+or focusing a cell shows the planned number. Logging a month opens over the grid (`#/plan/log/<month>`).
 
 **Dashboard.** Headline numbers, goal progress against the plan, alerts, and six charts (net
 worth, savings balance, income vs expenses, savings rate, plan vs actual net, and the gap by
