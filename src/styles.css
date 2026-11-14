@@ -609,10 +609,13 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
 .tab-hint a { font-weight: 600; }
 
 /* plan header: version on one row, buttons on the next, both on the right */
-.plan-actions { flex-direction: column; align-items: flex-end; gap: 8px; }
-.plan-buttons { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.plan-actions { display: grid; grid-template-columns: max-content; gap: 8px; justify-items: stretch; }
+.plan-actions .version-pick { width: 100%; }
+.plan-actions .version-pick select { flex: 1; min-width: 0; }
+/* buttons fill the same width as the version box, so both rows share left and right edges */
+.plan-buttons { display: flex; gap: 8px; align-items: stretch; }
+.plan-buttons > .btn { flex: 1 1 0; justify-content: center; text-align: center; white-space: nowrap; }
+.plan-buttons > .menu { flex: none; }
 @media (max-width: 899px) {
-  .plan-actions { width: 100%; align-items: stretch; }
-  .plan-actions .version-pick select { flex: 1; min-width: 0; }
-  .plan-buttons { justify-content: flex-start; }
+  .plan-actions { width: 100%; grid-template-columns: 1fr; }
 }
