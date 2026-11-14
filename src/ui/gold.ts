@@ -188,7 +188,7 @@ function draw(root: HTMLElement, ctx: Ctx, rows: HoldingRow[], prices: PriceRow[
         const raw = (f.elements.namedItem("price") as HTMLInputElement).value.trim().replace(/[,\s]/g, "");
         if (!AMOUNT_RE.test(raw) || Dec.of(raw).isZero()) return null;
         const k = Number((f.elements.namedItem("k") as HTMLSelectElement).value) as Karat;
-        return Dec.of(raw).div(world(k)).minus(1).times(100).round(1);
+        return Dec.of(raw).div(world(k)).minus(1).times(100).round(2);
       };
       const update = () => {
         const p = pctFor();
