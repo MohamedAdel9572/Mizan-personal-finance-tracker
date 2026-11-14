@@ -3,7 +3,7 @@ import { Dec } from "../engine/decimal.ts";
 import { currentMonth } from "../engine/month.ts";
 import { ApiError } from "../lib/api.ts";
 import { busy, emptyState, esc, formError, formValues, toast } from "../lib/dom.ts";
-import { egp, monthLabel, signed } from "../lib/format.ts";
+import { egp, money, monthLabel, signed } from "../lib/format.ts";
 import { passwordProblem, setToken } from "../lib/session.ts";
 import type { Ctx } from "./context.ts";
 
@@ -32,12 +32,16 @@ export function renderSettings(root: HTMLElement, ctx: Ctx, onSignedOut: () => v
         </div>
       </section>
       <form class="card" id="plan-colours" novalidate>
-        <h2>Plan colours</h2>
-        <p class="muted small">On the Actual tab a line is <span class="dot-status good"></span>green when it's on plan or better,
-          <span class="dot-status warn"></span>yellow when it's a little worse, and <span class="dot-status bad"></span>red beyond that.</p>
-        <label>Yellow up to this % worse than the plan
-          <span class="suffix"><input name="warn" inputmode="decimal" data-num="pct" maxlength="5" value="${esc(Dec.of(ctx.data.settings.warnPct).toString())}" aria-describedby="warn-hint"><span>%</span></span></label>
-        <p class="muted small" id="warn-hint">Example with 5%: Car planned 8,000 and you paid 8,300 (3.75% more) shows yellow; 8,500 (6.25% more) shows red. 0 means anything worse is red.</p>
+        <div class="section-head"><h2>Plan colours</h2><a class="small" href="#/plan/actual">See the Actual tab →</a></div>
+        <p class="muted small">Every line you log gets a dot that compares what happened with the plan.</p>
+        <label class="pc-limit">How much worse is still yellow?
+          <span class="suffix"><input name="warn" inputmode="decimal" data-num="pct" maxlength="5" value="${esc(Dec.of(ctx.data.settings.warnPct).toString())}" aria-describedby="pc-rules"><span>%</span></span></label>
+        <div class="pc-bar" aria-hidden="true">
+          <span class="pc-seg good"></span><span class="pc-seg warn"></span><span class="pc-seg bad"></span>
+        </div>
+        <div class="pc-ticks small" aria-hidden="true"><span class="good"></span><span class="warn"></span><span class="bad"></span></div>
+        <ul class="pc-rules" id="pc-rules" aria-live="polite"></ul>
+        <p class="muted small">Examples use a Car payment planned at 8,000. For income it's the other way round: earning less than planned is worse.</p>
         <button class="btn primary" type="submit">Save</button>
         <p class="form-error" hidden></p>
       </form>
@@ -73,6 +77,28 @@ export function renderSettings(root: HTMLElement, ctx: Ctx, onSignedOut: () => v
   }));
 
   const pc = root.querySelector<HTMLFormElement>("#plan-colours")!;
+  // live preview of the three colours for the % being typed
+  const warnInput = pc.querySelector<HTMLInputElement>("input[name=warn]")!;
+  const drawRules = () => {
+    const raw = warnInput.value.trim();
+    const ok = /^\d{1,2}(\.\d{1,2})?$/.test(raw) && Number(raw) <= 50;
+    const pct = ok ? Dec.of(raw) : Dec.of(ctx.data.settings.warnPct);
+    const plan = Dec.of(8000);
+    const limit = plan.plus(plan.times(pct).div(100)).round(0);
+    const p = pct.toString();
+    const off = pct.isZero();
+    const grow = off ? "0" : String(Math.max(0.35, Math.min(2.5, Number(p) / 4)));
+    pc.querySelectorAll<HTMLElement>(".pc-seg.warn, .pc-ticks .warn").forEach((el) => (el.style.flexGrow = grow));
+    pc.querySelector<HTMLElement>(".pc-ticks .good")!.textContent = money(plan);
+    pc.querySelector<HTMLElement>(".pc-ticks .warn")!.textContent = off ? "" : money(limit);
+    pc.querySelector("#pc-rules")!.innerHTML = `
+      <li class="good"><span class="dot-status good"></span><div><strong>On plan or better</strong><span>Spent no more than planned, or earned at least the plan.</span></div><span class="pc-eg">paid up to ${money(plan)}</span></li>
+      <li class="warn${off ? " off" : ""}"><span class="dot-status warn"></span><div><strong>A little worse</strong><span>${off ? "Off: with 0% there is no yellow." : `Up to ${esc(p)}% worse than the plan.`}</span></div><span class="pc-eg">${off ? "–" : `${money(plan.plus(1))} to ${money(limit)}`}</span></li>
+      <li class="bad"><span class="dot-status bad"></span><div><strong>Behind plan</strong><span>${off ? "Anything worse than the plan." : `More than ${esc(p)}% worse.`}</span></div><span class="pc-eg">above ${money(limit)}</span></li>`;
+    if (!ok && raw !== "") pc.querySelector("#pc-rules")!.insertAdjacentHTML("afterbegin", `<li class="pc-note small">Enter 0 to 50. Showing your saved ${esc(Dec.of(ctx.data.settings.warnPct).toString())}% until then.</li>`);
+  };
+  warnInput.addEventListener("input", drawRules);
+  drawRules();
   pc.addEventListener("submit", async (e) => {
     e.preventDefault();
     const raw = (formValues(pc).warn ?? "").trim();
