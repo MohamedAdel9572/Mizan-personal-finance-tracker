@@ -23,7 +23,7 @@ export function renderDashboard(root: HTMLElement, ctx: Ctx): void {
 
   root.innerHTML = `
     <div class="page-head"><h1>Hi ${esc(ctx.data.profile.full_name.split(" ")[0])}</h1></div>
-    ${notLogged ? `<a class="alert info link" href="#/log/${now}">${esc(monthLabel(now, true))} isn't logged yet. Log it →</a>` : ""}
+    ${notLogged ? `<div class="alert info notice-row"><span><strong>${esc(monthLabel(now, true))}</strong> isn't logged yet.</span><a class="btn primary small" href="#/log/${now}">Log it</a></div>` : ""}
     <div class="stats-grid">
       <div class="card stat"><span class="stat-label">Net worth</span><span class="stat-value num">${egp(netWorth)}</span>
         <span class="small muted">${lastActual ? `actual, ${esc(monthLabel(lastActual.month, true))}` : "planned"}</span></div>
@@ -33,7 +33,12 @@ export function renderDashboard(root: HTMLElement, ctx: Ctx): void {
       <div class="card stat"><span class="stat-label">Cumulative gap</span><span class="stat-value num ${last.cumulative.net.isNegative() ? "neg" : "pos"}">${signed(last.cumulative.net)}</span>
         <span class="small muted">since ${esc(monthLabel(t.start, true))}</span></div>` : ""}
     </div>
-    <p class="muted small">Goal progress, alerts and charts arrive with the full dashboard (step 4). <a href="#/compare">Plan vs actual →</a></p>`;
+    <div class="quick-actions">
+      <a class="btn ghost" href="#/compare">Plan vs actual</a>
+      <a class="btn ghost" href="#/plan">Plan</a>
+      <a class="btn ghost" href="#/plan/import">Import Excel</a>
+    </div>
+    <p class="muted small">Goal progress, alerts and charts arrive with the full dashboard (step 4).</p>`;
 }
 
 export function renderComingSoon(title: string, text: string): (root: HTMLElement) => void {

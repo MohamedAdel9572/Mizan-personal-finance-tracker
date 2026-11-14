@@ -4,7 +4,7 @@ import { planEnd, projectPlan } from "../engine/plan.ts";
 import type { PlanMonth, PlanVersion } from "../engine/types.ts";
 import { SEED_PLAN } from "../data/seed.ts";
 import { ApiError } from "../lib/api.ts";
-import { busy, emptyState, esc, formError, openDialog, toast } from "../lib/dom.ts";
+import { busy, esc, formError, openDialog, toast } from "../lib/dom.ts";
 import { money, monthLabel, dateTime } from "../lib/format.ts";
 import {
   defaultEffective, draftFromVersion, draftToPayload, emptyDraft, lastPlanMonth, newItem, validateDraft,
@@ -57,11 +57,15 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
 
   const { versions } = ctx.data;
   if (versions.length === 0) {
-    root.innerHTML = `<div class="page-head"><h1>Plan</h1></div>` + emptyState(
-      "No plan yet",
-      "Add your income, installments and savings account. Start from scratch or load the numbers from your Excel sheet and adjust them.",
-      { href: "#/plan/edit", label: "Create my plan" },
-    ) + `<p class="center"><a href="#/plan/import">Import from Excel</a> · <a href="/Mizan-template.xlsx" download>Download template</a> · <a href="#/plan/edit/sample">Use the sample numbers</a></p>`;
+    root.innerHTML = `
+      <div class="page-head"><div><h1>Plan</h1>
+        <p class="muted small">No plan yet. Pick how you want to start. You can change everything later.</p></div></div>
+      <div class="choices">
+        ${choice("#/plan/import", "upload", "Import from Excel", "Upload the Mizan template or your own month-by-month sheet. You'll see a preview first.", true)}
+        ${choice("#/plan/edit", "pencil", "Start from scratch", "Add your income, installments and savings account by hand.")}
+        ${choice("#/plan/edit/sample", "spark", "Use the sample numbers", "Start from the numbers of your Excel sheet and adjust them.")}
+        ${choice("/Mizan-template.xlsx", "download", "Download template", "An empty Excel file in the right format to fill in and upload.", false, true)}
+      </div>`;
     return;
   }
 
@@ -141,6 +145,22 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
     const dx = (e.changedTouches[0]?.clientX ?? 0) - x0;
     if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
   });
+}
+
+const CHOICE_ICONS: Record<string, string> = {
+  upload: '<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
+  download: '<path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
+  pencil: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
+  spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/>',
+};
+
+/** A big tappable option card (used where the user picks how to start). */
+function choice(href: string, icon: string, title: string, text: string, primary = false, download = false): string {
+  return `<a class="choice${primary ? " primary" : ""}" href="${esc(href)}"${download ? " download" : ""}>
+    <span class="choice-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${CHOICE_ICONS[icon]}</svg></span>
+    <span class="choice-body"><strong>${esc(title)}</strong><span class="muted small">${esc(text)}</span></span>
+    <span class="choice-arrow" aria-hidden="true">›</span>
+  </a>`;
 }
 
 function versionLabel(x: VersionInfo): string {

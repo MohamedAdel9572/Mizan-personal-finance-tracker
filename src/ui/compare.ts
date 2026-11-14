@@ -62,7 +62,7 @@ export function renderCompare(root: HTMLElement, ctx: Ctx): void {
       <section class="month-detail">
         <div class="detail-head">
           <h2>${esc(monthLabel(c.month, true))} <span class="badge ${c.onPlan ? "good" : "bad"}">${c.onPlan ? "On plan" : "Behind plan"}</span></h2>
-          <span class="muted small">compared with plan v${c.versionNo} · <a href="#/log/${c.month}">edit</a></span>
+          <span class="detail-actions"><span class="muted small">compared with plan v${c.versionNo}</span><a class="btn ghost small" href="#/log/${c.month}">Edit month</a></span>
         </div>
         ${c.biggestCause ? `<div class="alert ${c.onPlan ? "warning" : "danger"}"><strong>Biggest cause:</strong> ${esc(c.biggestCause.name)}, ${signed(c.biggestCause.netEffect)} EGP on your net.</div>` : ""}
         <div class="stats-grid">

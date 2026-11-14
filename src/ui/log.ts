@@ -80,7 +80,7 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
       </label>
       <button class="icon-btn" data-go="${esc(addMonths(month, 1))}" aria-label="Next month" ${month >= now ? "disabled" : ""}>›</button>
     </div>
-    ${checkin ? `<p class="notice ok">Checked in. Saving again updates it. <a href="#/compare/${esc(month)}">See plan vs actual →</a></p>` : ""}
+    ${checkin ? `<div class="notice ok notice-row"><span>Checked in. Saving again updates it.</span><a class="btn ghost small" href="#/compare/${esc(month)}">Plan vs actual</a></div>` : ""}
 
     <div class="log-layout">
       <form id="checkin" class="card" novalidate>

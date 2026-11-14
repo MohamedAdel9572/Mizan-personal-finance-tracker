@@ -25,7 +25,7 @@ export function renderLogin(root: HTMLElement, api: Api, onSignedIn: () => void)
       <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
       <button class="btn primary block" type="submit">Sign in</button>
     </form>
-    <p class="center small">No account yet? <a href="#/signup">Create one</a></p>`);
+    <div class="auth-switch"><span class="muted small">No account yet?</span><a class="btn ghost block" href="#/signup">Create an account</a></div>`);
 
   const form = root.querySelector<HTMLFormElement>("#login")!;
   form.addEventListener("submit", async (e) => {
@@ -63,7 +63,7 @@ export function renderSignup(root: HTMLElement, api: Api, onSignedIn: () => void
       <label>Repeat password<input name="password2" type="password" autocomplete="new-password" required></label>
       <button class="btn primary block" type="submit">Create account</button>
     </form>
-    <p class="center small">Already registered? <a href="#/login">Sign in</a></p>`);
+    <div class="auth-switch"><span class="muted small">Already registered?</span><a class="btn ghost block" href="#/login">Sign in</a></div>`);
 
   const form = root.querySelector<HTMLFormElement>("#signup")!;
   form.addEventListener("submit", async (e) => {
