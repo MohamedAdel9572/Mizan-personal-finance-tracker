@@ -48,7 +48,7 @@ interface GridRow {
   tag?: { text: string; title: string };
 }
 
-function gridRows(v: PlanVersion, ctx: Ctx): { section: string; rows: GridRow[] }[] {
+function gridRows(v: PlanVersion, ctx: Ctx, older: readonly PlanVersion[] = []): { section: string; rows: GridRow[] }[] {
   const cmp = new Map(ctx.data.comparisons.filter((c) => !c.assumed).map((c) => [c.month, c]));
   const act = new Map(ctx.data.actuals.filter((a) => !a.assumed).map((a) => [a.month, a]));
   const lineActual = (key: string) => (m: Month): Actual | null => {
@@ -71,7 +71,11 @@ function gridRows(v: PlanVersion, ctx: Ctx): { section: string; rows: GridRow[] 
       ...(autoGold ? { tag: { text: "automatic", title: "Value of your gold pieces at today's Egyptian shop price (Gold page). Logged months keep the value from the day you logged them." } } : {}),
     };
   };
-  const of = (kind: string) => v.items.filter((i) => i.kind === kind).map((i) => line(i.key, i.name, kind !== "asset"));
+  // lines of this version, then lines that only the older versions shown in the grid had
+  // (e.g. a line you removed from Dec still shows in the months before Dec)
+  const items = [...v.items];
+  for (const o of older) for (const it of o.items) if (!items.some((x) => x.key === it.key)) items.push(it);
+  const of = (kind: string) => items.filter((i) => i.kind === kind).map((i) => line(i.key, i.name, kind !== "asset"));
   const unplanned = (kind: "income" | "expense"): GridRow[] => {
     const items = ctx.data.unplanned.filter((u) => u.kind === kind);
     if (!items.length) return [];
@@ -182,9 +186,16 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
   planReturn.tab = tab;
   const info = versions.find((v) => v.version.versionNo === selectedVersionNo) ?? versions[0]!;
   const v = info.version;
-  const rows = projectPlan(v);
+  // Newest version: every month shows the plan that was in force that month (same as the log,
+  // the Actual tab and the Dashboard). An older version picked in the menu shows on its own.
+  const isLatest = info === versions[0];
+  const tl = ctx.data.timeline;
+  const rows = projectPlan(v).map((r) => (isLatest && tl ? tl.planned(r.month) ?? r : r));
+  const olderShown = isLatest && tl
+    ? [...new Set(rows.map((r) => tl.versionFor(r.month)).filter((x): x is PlanVersion => !!x && x !== v))]
+    : [];
   const now = currentMonth();
-  const groups = gridRows(v, ctx);
+  const groups = gridRows(v, ctx, olderShown);
   const logged = new Map(ctx.data.comparisons.filter((c) => !c.assumed).map((c) => [c.month, c]));
   const target = logTarget(ctx);
   const canLog = (m: Month) => !!ctx.data.timeline && m >= ctx.data.timeline.start && m <= now;
@@ -233,6 +244,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
         </div>
       </div>
     </div>
+    ${isLatest && olderShown.length ? `<p class="notice small">Months before ${esc(monthLabel(v.effectiveFrom, true))} follow the plan that was in force then (${olderShown.map((o) => `v${o.versionNo}`).join(", ")}). Version ${v.versionNo} applies from ${esc(monthLabel(v.effectiveFrom, true))}.</p>` : ""}
     ${info !== versions[0] ? `<p class="notice">You are looking at an older version. Months from ${esc(monthLabel(v.effectiveFrom, true))} were compared with it until a newer version took over.</p>` : ""}
     <div class="plan-tabs">
       <div class="segmented tabs" role="tablist" aria-label="Plan or actual">
