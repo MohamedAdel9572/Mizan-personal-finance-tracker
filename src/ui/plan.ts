@@ -8,7 +8,7 @@ import { ApiError } from "../lib/api.ts";
 import { busy, esc, formError, openDialog, toast } from "../lib/dom.ts";
 import { money, monthLabel, dateTime } from "../lib/format.ts";
 import {
-  defaultEffective, draftFromVersion, draftToPayload, emptyDraft, lastPlanMonth, newItem, validateDraft,
+  cleanAmount, defaultEffective, draftFromVersion, draftToPayload, emptyDraft, lastPlanMonth, newItem, validateDraft,
   type Draft, type DraftItem,
 } from "../lib/planDraft.ts";
 import { isGoldLine, type VersionInfo } from "../lib/store.ts";
@@ -476,9 +476,44 @@ export function hasUnsavedPlan(): boolean {
 export function discardPlanDraft(): void {
   draft = null;
   dirty = false;
+  openItems.clear();
+  settingsOpen = false;
 }
 
-const KIND_LABEL = { income: "Income", expense: "Installment / expense", asset: "Asset (gold, other)" } as const;
+/** lines whose editor is open (indexes into draft.items) and whether the plan settings are open */
+const openItems = new Set<number>();
+let settingsOpen = false;
+
+const short = (m: string) => (isMonth(m) ? monthLabel(m) : "?");
+const shownAmount = (raw: string) => {
+  const c = cleanAmount(raw);
+  return /^\d+(\.\d+)?$/.test(c) ? money(c) : "–";
+};
+
+/** One-line description of a line for the closed row, plus the amount shown on the right. */
+function itemSummary(item: DraftItem): { sub: string; amt: string } {
+  if (item.kind === "asset" && isGoldLine(item.name)) return { sub: "Automatic, from your Gold page", amt: "Auto" };
+  const sorted = [...item.amounts].sort((a, b) => a.month.localeCompare(b.month));
+  if (item.recurrence === "one_off") {
+    const months = sorted.filter((a) => isMonth(a.month));
+    const list = months.slice(0, 4).map((a) => short(a.month)).join(", ") + (months.length > 4 ? ", …" : "");
+    const nums = months.map((a) => cleanAmount(a.amount));
+    const total = nums.length && nums.every((n) => /^\d+(\.\d+)?$/.test(n)) ? money(nums.reduce((t, n) => t.plus(Dec.of(n)), Dec.of(0)).toFixed(2)) : "–";
+    return { sub: `${months.length} month${months.length === 1 ? "" : "s"}${list ? ` · ${list}` : ""}`, amt: months.length > 1 ? `${total} total` : total };
+  }
+  const span = `Every month · ${short(item.start)} → ${item.end ? short(item.end) : "no end"}`;
+  const first = item.amounts[0];
+  const changes = item.amounts.slice(1).sort((a, b) => a.month.localeCompare(b.month));
+  const now = currentMonth();
+  const inForce = changes.filter((a) => isMonth(a.month) && a.month <= now).at(-1) ?? first;
+  const changeText = changes.length === 0 ? "" : changes.length <= 2
+    ? " · " + changes.map((a) => `${shownAmount(a.amount)} from ${short(a.month)}`).join(", ")
+    : ` · changes ${changes.length} times`;
+  return { sub: span + changeText, amt: shownAmount(inForce?.amount ?? "") };
+}
+
+const CHEVRON = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const BIN = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4.5 7h15M10 11v6M14 11v6M6.5 7l.8 11.2A2 2 0 0 0 9.3 20h5.4a2 2 0 0 0 2-1.8L17.5 7M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
   const latest = ctx.data.versions[0]?.rawVersion;
@@ -486,60 +521,83 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
     draft = latest ? draftFromVersion(latest) : sample ? draftFromVersion({ ...SEED_PLAN }) : emptyDraft(currentMonth());
     if (sample && !latest) draft.items.forEach((i) => (i.key = "")); // new lines get real keys from the database
     dirty = !latest && sample;
+    openItems.clear();
+    settingsOpen = !latest;
   }
   const d = draft;
   const end = lastPlanMonth(d);
 
-  const amountRow = (item: DraftItem, i: number, a: { month: string; amount: string }, j: number) => `
+  const amountRow = (item: DraftItem, i: number, a: { month: string; amount: string }, j: number) => {
+    const fixedFirst = item.recurrence === "recurring" && j === 0;
+    return `
     <div class="amount-row">
-      <label><span class="sr-only">Month</span><input type="month" data-i="${i}" data-j="${j}" data-f="month" value="${esc(a.month)}" ${item.recurrence === "recurring" && j === 0 ? "disabled title=\"Same as the start month\"" : ""}></label>
+      ${fixedFirst
+        ? `<span class="amt-from">${item.recurrence === "recurring" && item.amounts.length > 1 ? "Starting amount" : "Amount"}</span>`
+        : `<label><span class="sr-only">${item.recurrence === "recurring" ? "Changes from" : "Month"}</span><input type="month" data-i="${i}" data-j="${j}" data-f="month" value="${esc(a.month)}"></label>`}
       <label><span class="sr-only">Amount</span><input inputmode="decimal" data-i="${i}" data-j="${j}" data-f="amount" value="${esc(a.amount)}" placeholder="0"></label>
-      <button type="button" class="icon-btn danger" data-del-amount="${i}:${j}" aria-label="Remove amount"${item.amounts.length === 1 ? " disabled" : ""}>×</button>
+      ${fixedFirst ? "<span></span>" : `<button type="button" class="icon-btn danger" data-del-amount="${i}:${j}" aria-label="Remove amount"${item.amounts.length === 1 ? " disabled" : ""}>×</button>`}
     </div>`;
+  };
 
-  const itemCard = (item: DraftItem, i: number) => `
-    <fieldset class="card item-card kind-${item.kind}" id="item-${i}">
+  const closedRow = (item: DraftItem, i: number) => {
+    const s = itemSummary(item);
+    return `
+    <div class="item-row kind-${item.kind}" id="item-${i}">
+      <button type="button" class="item-toggle" data-open-item="${i}" aria-expanded="false">
+        <span class="ir-main"><span class="ir-name">${esc(item.name) || `<span class="muted">Untitled line</span>`}</span><span class="ir-sub">${esc(s.sub)}</span></span>
+        <span class="ir-amt">${esc(s.amt)}</span>
+        <span class="ir-chev">${CHEVRON}</span>
+      </button>
+    </div>`;
+  };
+
+  const openCard = (item: DraftItem, i: number) => {
+    const gold = item.kind === "asset" && isGoldLine(item.name);
+    const rec = item.recurrence === "recurring";
+    return `
+    <fieldset class="item-open kind-${item.kind}" id="item-${i}">
       <legend class="sr-only">Line ${i + 1}</legend>
       <div class="item-head">
         <input class="item-name" data-i="${i}" data-f="name" value="${esc(item.name)}" placeholder="Name, e.g. Salary" aria-label="Line name" maxlength="80">
-        <button type="button" class="icon-btn danger" data-del-item="${i}" aria-label="Remove line ${esc(item.name)}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4.5 7h15M10 11v6M14 11v6M6.5 7l.8 11.2A2 2 0 0 0 9.3 20h5.4a2 2 0 0 0 2-1.8L17.5 7M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button type="button" class="icon-btn danger" data-del-item="${i}" aria-label="Remove line ${esc(item.name)}">${BIN}</button>
       </div>
-      <div class="row-2 type-row">
-        <label>Type<select data-i="${i}" data-f="kind" ${item.key ? "disabled title=\"A saved line can't change type. Add a new line instead.\"" : ""}>
-          ${(["income", "expense", "asset"] as const).map((k) => `<option value="${k}"${item.kind === k ? " selected" : ""}>${KIND_LABEL[k]}</option>`).join("")}
-        </select></label>
-        <label>Repeats<select data-i="${i}" data-f="recurrence" ${item.kind === "asset" ? "disabled" : ""}>
-          <option value="recurring"${item.recurrence === "recurring" ? " selected" : ""}>Every month</option>
-          <option value="one_off"${item.recurrence === "one_off" ? " selected" : ""}>One-off months</option>
-        </select></label>
-      </div>
-      ${item.recurrence === "recurring" ? `
+      ${item.kind === "asset" ? "" : `
+      <div class="seg" role="radiogroup" aria-label="Repeats">
+        <label><input type="radio" name="rec-${i}" data-i="${i}" data-f="recurrence" value="recurring"${rec ? " checked" : ""}><span>Every month</span></label>
+        <label><input type="radio" name="rec-${i}" data-i="${i}" data-f="recurrence" value="one_off"${rec ? "" : " checked"}><span>Specific months</span></label>
+      </div>`}
+      ${rec ? `
       <div class="row-2">
         <label>From<input type="month" data-i="${i}" data-f="start" value="${esc(item.start)}"></label>
-        <label>Until <span class="muted small">(empty = no end)</span><input type="month" data-i="${i}" data-f="end" value="${esc(item.end)}"></label>
+        <label>Until <span class="muted small">(optional)</span><input type="month" data-i="${i}" data-f="end" value="${esc(item.end)}"></label>
       </div>` : ""}
-      ${item.kind === "asset" && isGoldLine(item.name) ? `<p class="notice small">Automatic: this line shows the value of your pieces on the Gold page at today's Egyptian shop price. The amount below is only used if you have no gold pieces.</p>` : ""}
+      ${gold ? `<p class="notice small">Automatic: this line shows the value of your pieces on the Gold page at today's Egyptian shop price. The amount below is only used if you have no gold pieces.</p>` : ""}
       <div class="amounts">
-        <div class="amount-head muted small"><span>${item.recurrence === "recurring" ? "Amount from month" : "Month"}</span><span>${item.kind === "asset" ? "Value" : "Amount"} (EGP)</span><span></span></div>
+        ${rec ? "" : `<div class="amount-head muted small"><span>Month</span><span>Amount (EGP)</span><span></span></div>`}
         ${item.amounts.map((a, j) => amountRow(item, i, a, j)).join("")}
-        <button type="button" class="btn ghost small" data-add-amount="${i}">+ ${item.recurrence === "recurring" ? "Amount changes from…" : "Add month"}</button>
+        <button type="button" class="btn ghost small" data-add-amount="${i}">+ ${rec ? "Raise / change from…" : "Add month"}</button>
       </div>
+      <div class="item-done"><button type="button" class="btn ghost small" data-close-item="${i}">Done</button></div>
     </fieldset>`;
+  };
 
-  const section = (kind: DraftItem["kind"], title: string) => {
+  const section = (kind: DraftItem["kind"], title: string, addLabel: string) => {
     const list = d.items.map((it, i) => [it, i] as const).filter(([it]) => it.kind === kind);
     return `<section class="editor-section">
-      <h2>${title} <span class="muted small">(${list.length})</span></h2>
-      ${list.map(([it, i]) => itemCard(it, i)).join("") || `<p class="muted small">Nothing yet.</p>`}
-      <button type="button" class="btn ghost" data-add-item="${kind}">+ Add ${title.toLowerCase().replace(/s$/, "")}</button>
+      <div class="section-head"><h2>${title} <span class="muted small">(${list.length})</span></h2>
+        <button type="button" class="btn ghost small" data-add-item="${kind}" aria-label="${addLabel}">+ <span class="add-word">${addLabel}</span><span class="add-short">Add</span></button></div>
+      <div class="item-list">${list.map(([it, i]) => (openItems.has(i) ? openCard(it, i) : closedRow(it, i))).join("") || `<p class="muted small">Nothing yet.</p>`}</div>
     </section>`;
   };
+
+  const rateText = d.rates.length > 1 ? `interest ${esc(d.rates[0]!.rate)}% (changes ${d.rates.length - 1}×)` : `interest ${esc(d.rates[0]?.rate ?? "0")}%`;
+  const settingsSummary = `Starts ${isMonth(d.start) ? monthLabel(d.start, true) : "?"} · ${esc(d.horizonMonths)} months · opening ${shownAmount(d.openingBalance)} · ${rateText}`;
 
   root.innerHTML = `
     <form id="plan-editor" novalidate>
       <div class="page-head">
         <div><h1>${latest ? "Edit plan" : "Create plan"}</h1>
-        <p class="muted small">${latest ? `Saving creates version ${latest.versionNo + 1}. Version ${latest.versionNo} is kept as it is.` : "You can change everything later. Every change is kept as a new version."}</p></div>
+        <p class="muted small">${latest ? `Tap a line to change it. Saving creates version ${latest.versionNo + 1}; version ${latest.versionNo} is kept.` : "Tap a line to change it. You can change everything later."}</p></div>
         <div class="head-actions">
           ${latest ? `<a class="btn ghost" href="#/plan" data-cancel>Cancel</a>` : ""}
           <button class="btn primary head-save" type="submit">Save plan</button>
@@ -547,27 +605,39 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
       </div>
       <div id="problems"></div>
 
-      <section class="card editor-section">
-        <h2>Plan & savings account</h2>
-        <div class="row-3">
-          <label>Start month<input type="month" data-f="start" value="${esc(d.start)}"></label>
-          <label>Horizon (months)<input inputmode="numeric" data-f="horizonMonths" value="${esc(d.horizonMonths)}"></label>
-          <label>Opening savings (EGP)<input inputmode="decimal" data-f="openingBalance" value="${esc(d.openingBalance)}"></label>
-        </div>
-        ${end ? `<p class="muted small">Plan runs to ${esc(monthLabel(end, true))}.</p>` : ""}
-        <h3>Annual interest rate</h3>
-        ${d.rates.map((r, k) => `
-          <div class="amount-row">
-            <label><span class="sr-only">From month</span><input type="month" data-rate="${k}" data-f="from" value="${esc(r.from)}" ${k === 0 ? "disabled title=\"Same as the start month\"" : ""}></label>
-            <label class="suffix"><span class="sr-only">Rate</span><input inputmode="decimal" data-num="pct" maxlength="6" data-rate="${k}" data-f="rate" value="${esc(r.rate)}"><span>%</span></label>
-            <button type="button" class="icon-btn danger" data-del-rate="${k}" aria-label="Remove rate"${d.rates.length === 1 ? " disabled" : ""}>×</button>
-          </div>`).join("")}
-        <button type="button" class="btn ghost small" data-add-rate>+ Rate changes from…</button>
+      <section class="editor-section">
+      ${settingsOpen ? `
+        <fieldset class="item-open settings-open">
+          <legend class="sr-only">Plan and savings account</legend>
+          <h2>Plan and savings account</h2>
+          <div class="row-3">
+            <label>Start month<input type="month" data-f="start" value="${esc(d.start)}"></label>
+            <label>Length (months)<input inputmode="numeric" data-f="horizonMonths" value="${esc(d.horizonMonths)}"></label>
+            <label>Opening savings (EGP)<input inputmode="decimal" data-f="openingBalance" value="${esc(d.openingBalance)}"></label>
+          </div>
+          ${end ? `<p class="muted small">Plan runs to ${esc(monthLabel(end, true))}.</p>` : ""}
+          <div class="amounts">
+            ${d.rates.map((r, k) => `
+              <div class="amount-row">
+                ${k === 0 ? `<span class="amt-from">${d.rates.length > 1 ? "Interest at start" : "Annual interest"}</span>` : `<label><span class="sr-only">From month</span><input type="month" data-rate="${k}" data-f="from" value="${esc(r.from)}"></label>`}
+                <label class="suffix"><span class="sr-only">Rate</span><input inputmode="decimal" data-num="pct" maxlength="6" data-rate="${k}" data-f="rate" value="${esc(r.rate)}"><span>%</span></label>
+                ${k === 0 ? "<span></span>" : `<button type="button" class="icon-btn danger" data-del-rate="${k}" aria-label="Remove rate">×</button>`}
+              </div>`).join("")}
+            <button type="button" class="btn ghost small" data-add-rate>+ Rate changes from…</button>
+          </div>
+          <div class="item-done"><button type="button" class="btn ghost small" data-close-settings>Done</button></div>
+        </fieldset>` : `
+        <div class="item-row settings-row">
+          <button type="button" class="item-toggle" data-open-settings aria-expanded="false">
+            <span class="ir-main"><span class="ir-name">Plan and savings account</span><span class="ir-sub">${settingsSummary}</span></span>
+            <span class="ir-amt"></span><span class="ir-chev">${CHEVRON}</span>
+          </button>
+        </div>`}
       </section>
 
-      ${section("income", "Income")}
-      ${section("expense", "Installments & expenses")}
-      ${section("asset", "Assets")}
+      ${section("income", "Income", "Add income")}
+      ${section("expense", "Installments and expenses", "Add expense")}
+      ${section("asset", "Assets", "Add asset")}
       <div class="sticky-save mobile-only"><button class="btn primary block" type="submit">Save plan</button></div>
     </form>`;
 
@@ -610,13 +680,10 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
 
   // structural changes: re-render
   form.addEventListener("change", (e) => {
-    const el = e.target as HTMLSelectElement;
-    if (el.tagName !== "SELECT" || el.dataset.i === undefined) return;
+    const el = e.target as HTMLInputElement;
+    if (el.dataset.f !== "recurrence" || el.dataset.i === undefined || !el.checked) return;
     const item = d.items[Number(el.dataset.i)]!;
-    if (el.dataset.f === "kind") {
-      item.kind = el.value as DraftItem["kind"];
-      if (item.kind === "asset") item.recurrence = "recurring";
-    } else if (el.dataset.f === "recurrence") {
+    {
       item.recurrence = el.value as DraftItem["recurrence"];
       if (item.recurrence === "recurring") {
         const first = [...item.amounts].sort((a, b) => a.month.localeCompare(b.month))[0];
@@ -624,6 +691,7 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
         item.end = "";
       }
     }
+    dirty = true;
     rerender();
   });
 
@@ -632,8 +700,21 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
     if (!b || b.type === "submit") return;
     const ds = b.dataset;
     const month = d.start && isMonth(d.start) ? defaultEffective(currentMonth(), null, d.start) : currentMonth();
-    if (ds.addItem) {
+    if (ds.openItem !== undefined || ds.closeItem !== undefined) {
+      const i = Number(ds.openItem ?? ds.closeItem);
+      if (ds.openItem !== undefined) openItems.add(i);
+      else openItems.delete(i);
+      rerender();
+      const el = root.querySelector<HTMLElement>(`#item-${i}`);
+      if (ds.openItem !== undefined) el?.querySelector<HTMLInputElement>(".item-name")?.focus({ preventScroll: true });
+      else el?.querySelector<HTMLButtonElement>(".item-toggle")?.focus({ preventScroll: true });
+      el?.scrollIntoView({ block: "nearest" });
+    } else if (ds.openSettings !== undefined || ds.closeSettings !== undefined) {
+      settingsOpen = ds.openSettings !== undefined;
+      rerender();
+    } else if (ds.addItem) {
       d.items.push(newItem(ds.addItem as DraftItem["kind"], month));
+      openItems.add(d.items.length - 1);
       dirty = true;
       rerender();
       root.querySelector<HTMLInputElement>(`#item-${d.items.length - 1} .item-name`)?.focus();
@@ -643,7 +724,11 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
         ? `Remove "${item.name}" from the plan? Earlier versions and your logged actuals for it are kept.`
         : `Remove "${item.name || "this line"}"?`;
       if (!confirm(msg)) return;
-      d.items.splice(Number(ds.delItem), 1);
+      const gone = Number(ds.delItem);
+      d.items.splice(gone, 1);
+      const kept = [...openItems].filter((k) => k !== gone).map((k) => (k > gone ? k - 1 : k));
+      openItems.clear();
+      kept.forEach((k) => openItems.add(k));
       dirty = true;
       rerender();
     } else if (ds.addAmount) {
@@ -678,8 +763,13 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const problems = validateDraft(d);
+    if (problems.length) {
+      // open every line with a problem so the boxes to fix are visible
+      problems.forEach((p) => p.item !== null && openItems.add(p.item));
+      if (problems.some((p) => p.item === null)) settingsOpen = true;
+      rerender();
+    }
     const box = root.querySelector<HTMLElement>("#problems")!;
-    root.querySelectorAll(".item-card.invalid").forEach((el) => el.classList.remove("invalid"));
     if (problems.length) {
       box.innerHTML = `<div class="alert danger" role="alert"><strong>Please fix ${problems.length === 1 ? "this" : `these ${problems.length} things`}:</strong><ul>${problems.slice(0, 12).map((p) => `<li>${p.item !== null ? `<a href="#item-${p.item}" data-jump="${p.item}">${esc(p.message)}</a>` : esc(p.message)}</li>`).join("")}</ul></div>`;
       problems.forEach((p) => p.item !== null && root.querySelector(`#item-${p.item}`)?.classList.add("invalid"));
