@@ -74,7 +74,7 @@ function draw(root: HTMLElement, ctx: Ctx, data: CardsData): void {
     const line = sel.history.find((h) => h.txn.id === Number(r.dataset.txn));
     if (line) editTxn(ctx, sel, line.txn, line.txn.kind, reload);
   }));
-  root.querySelector("[data-edit-card]")?.addEventListener("click", () => editCard(ctx, sel.card, reload));
+  root.querySelector("[data-edit-card]")?.addEventListener("click", () => editCard(ctx, sel, reload));
 
   const chartEl = root.querySelector<HTMLElement>("#card-chart");
   if (chartEl) {
@@ -157,9 +157,8 @@ function detail(s: CardState, t: string): string {
     </button></li>`;
   }).join("");
 
-  const start = credit
-    ? `Starting point: ${n2(Dec.of(c.opening_balance))} already used before these entries (change it in Edit card)`
-    : `Starting point: a balance of ${n2(Dec.of(c.opening_balance))} before these entries (change it in Edit card)`;
+  const before = credit ? s.limit!.minus(Dec.of(c.opening_balance)) : Dec.of(c.opening_balance);
+  const start = `Balance before these entries: ${n2(before)}. To correct the balance, type the current one in Edit card`;
 
   return `
   <section class="card-detail">
@@ -192,8 +191,16 @@ function fail(ctx: Ctx, dialog: HTMLDialogElement, form: HTMLFormElement, ex: un
 }
 
 /** Add a card (card = null) or edit one, with delete. */
-function editCard(ctx: Ctx, card: CardRow | null, reload: () => void): void {
+/**
+ * Add a card (state = null) or edit one, with delete. You type the current balance (what you can
+ * spend now); the database keeps the starting point before the history, so it's worked out here:
+ *   credit: already used before the entries = limit + net effect of the entries - current balance
+ *   debit:  balance before the entries      = current balance - net effect of the entries
+ */
+function editCard(ctx: Ctx, state: CardState | null, reload: () => void): void {
+  const card = state?.card ?? null;
   const kind = card?.kind ?? "credit";
+  const net = state ? Dec.sum(state.history.map((h) => h.effect)) : Dec.ZERO;
   const colors = CARD_COLORS.map((c) => `<label class="swatch pc-${c}"><input type="radio" name="color" value="${c}"${(card?.color ?? "indigo") === c ? " checked" : ""}><span class="sr-only">${c}</span></label>`).join("");
   openDialog(`
     <form id="card-form" novalidate>
@@ -211,7 +218,7 @@ function editCard(ctx: Ctx, card: CardRow | null, reload: () => void): void {
       </div>
       <div class="row-2">
         <label class="only-credit">Credit limit (EGP)<input name="credit_limit" inputmode="decimal" data-num="money" value="${esc(card?.credit_limit ? Dec.of(card.credit_limit).toString() : "")}" placeholder="50000"></label>
-        <label><span class="lbl-credit">Already used now (EGP)</span><span class="lbl-debit">Balance now (EGP)</span><input name="opening_balance" inputmode="decimal" data-num="money" value="${esc(card ? Dec.of(card.opening_balance).toString() : "")}" placeholder="0"></label>
+        <label><span class="lbl-credit">Current balance (EGP) <span class="muted small">available to spend</span></span><span class="lbl-debit">Current balance (EGP)</span><input name="current" inputmode="decimal" data-num="money" value="${esc(state ? state.available.round(2).toString() : "")}" placeholder="${kind === "credit" ? "same as the limit if unused" : "0"}"></label>
       </div>
       <fieldset class="swatches"><legend>Colour</legend>${colors}</fieldset>
       <p class="muted small">Only the last 4 digits are saved. Never type the full card number.</p>
@@ -231,13 +238,23 @@ function editCard(ctx: Ctx, card: CardRow | null, reload: () => void): void {
       const f = formValues(form);
       const k = form.dataset.kind!;
       const lim = (f.credit_limit ?? "").replace(/[,\s]/g, "");
-      const open = (f.opening_balance ?? "").replace(/[,\s]/g, "") || "0";
+      const cur = (f.current ?? "").replace(/[,\s]/g, "");
+      const curOk = AMOUNT_RE.test(cur);
+      // empty current balance on a new credit card = nothing used yet
+      const current = curOk ? Dec.of(cur) : k === "credit" && !cur && AMOUNT_RE.test(lim) ? Dec.of(lim) : null;
+      const opening = current === null ? null
+        : k === "credit" ? (AMOUNT_RE.test(lim) ? Dec.of(lim).plus(net).minus(current) : Dec.ZERO)
+        : current.minus(net);
+      const open = opening ? opening.round(2).toString() : "0";
       const last4 = (f.last4 ?? "").trim();
       const due = (f.due_day ?? "").trim();
       const problem = !(f.name ?? "").trim() ? "Give the card a name."
         : last4 && !/^\d{4}$/.test(last4) ? "Last 4 digits must be exactly 4 numbers."
         : k === "credit" && (!AMOUNT_RE.test(lim) || Dec.of(lim).isZero()) ? "Credit limit must be more than 0."
-        : !AMOUNT_RE.test(open) ? `${k === "credit" ? "Already used" : "Balance"} must be a number of 0 or more.`
+        : current === null ? "Current balance must be a number of 0 or more."
+        : opening!.isNegative() ? (k === "credit"
+            ? `Current balance can't be more than ${n2(Dec.of(lim).plus(net))} with the entries in this card's history.`
+            : `Current balance can't be less than ${n2(net)} with the entries in this card's history.`)
         : k === "credit" && due && (!/^\d{1,2}$/.test(due) || Number(due) < 1 || Number(due) > 31) ? "Payment due day must be from 1 to 31."
         : null;
       formError(form, problem);
