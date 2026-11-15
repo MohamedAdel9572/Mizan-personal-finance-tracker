@@ -112,7 +112,7 @@ function renderPreview(box: HTMLElement, ctx: Ctx, p: ParsedImport, fileName: st
         <td class="num">${i.amounts.map((a) => `${esc(a.month)}: ${money(a.amount)}`).join("<br>")}</td></tr>`).join("")}
       </tbody></table></details>` : ""}
     <form id="confirm" class="card" novalidate>
-      ${d && planChanged && latest ? `<label>Use the imported plan from<input type="month" name="effective" value="${esc(eff)}" min="${esc(latest.effectiveFrom)}"></label>
+      ${d && planChanged && latest ? `<label>Use the imported plan from<input type="month" name="effective" value="${esc(eff)}" min="${esc(d.start)}"></label>
         <p class="muted small">Months before that stay compared with version ${latest.versionNo}.</p>` : ""}
       <button class="btn primary" type="submit" ${blocked || nothing ? "disabled" : ""}>${nothing && !blocked ? "Nothing new to import" : "Import"}</button>
       <p class="form-error" hidden></p>
@@ -124,9 +124,9 @@ function renderPreview(box: HTMLElement, ctx: Ctx, p: ParsedImport, fileName: st
     if (blocked || nothing) return;
     const effective = (form.elements.namedItem("effective") as HTMLInputElement | null)?.value ?? d?.start ?? "";
     const err = form.querySelector<HTMLElement>(".form-error")!;
-    if (d && planChanged && latest && (!isMonth(effective) || effective < latest.effectiveFrom)) {
+    if (d && planChanged && latest && (!isMonth(effective) || effective < d.start)) {
       err.hidden = false;
-      err.textContent = `Pick a month from ${monthLabel(latest.effectiveFrom, true)} on.`;
+      err.textContent = `Pick a month from ${monthLabel(d.start, true)} on.`;
       return;
     }
     const btn = form.querySelector<HTMLButtonElement>("button")!;

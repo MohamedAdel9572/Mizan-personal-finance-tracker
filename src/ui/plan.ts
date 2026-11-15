@@ -809,8 +809,8 @@ function askEffectiveAndSave(ctx: Ctx, d: Draft, latest: PlanVersion | null): vo
     <form method="dialog" id="save-form" novalidate>
       <h2>Save plan</h2>
       ${latest ? `
-        <label>Use this version from<input type="month" name="effective" value="${esc(eff)}" min="${esc(latest.effectiveFrom)}" required></label>
-        <p class="muted small">Months before ${esc(monthLabel(eff, true))} stay compared with version ${latest.versionNo}. Pick an earlier month only to fix a mistake.</p>`
+        <label>Use this version from<input type="month" name="effective" value="${esc(eff)}" min="${esc(d.start)}" required></label>
+        <p class="muted small">Every month from this one uses the new version. Earlier months keep the plan that was in force then. Pick an earlier month only to fix a mistake.</p>`
       : `<p class="muted small">This is your first plan. It covers ${esc(monthLabel(d.start, true))} to ${esc(monthLabel(end, true))}.</p>`}
       <label>Note <span class="muted small">(optional, e.g. "salary raise")</span><input name="note" maxlength="500"></label>
       <div class="dialog-actions">
@@ -824,7 +824,7 @@ function askEffectiveAndSave(ctx: Ctx, d: Draft, latest: PlanVersion | null): vo
       const effective = (form.elements.namedItem("effective") as HTMLInputElement | null)?.value ?? d.start;
       const note = (form.elements.namedItem("note") as HTMLInputElement).value.trim();
       if (!isMonth(effective)) return formError(form, "Pick a valid month.");
-      if (latest && effective < latest.effectiveFrom) return formError(form, `Can't be before ${monthLabel(latest.effectiveFrom, true)}.`);
+      if (effective < d.start) return formError(form, `Can't be before the plan start (${monthLabel(d.start, true)}).`);
       await busy(form, async () => {
         try {
           const res = await ctx.api.rpc<{ version_no: number }>("save_plan_version", { p_plan: draftToPayload(d, effective, note) });

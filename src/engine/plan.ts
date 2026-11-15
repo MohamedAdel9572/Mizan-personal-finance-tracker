@@ -97,15 +97,16 @@ export function projectPlan(version: PlanVersion, until: Month = planEnd(version
   return out;
 }
 
-/** The version that was active in month m: latest effectiveFrom <= m. */
+/**
+ * The version in force in month m: the newest version (highest number) whose "from" month
+ * has started. A newer save wins from its month onward, also over an older version that
+ * started later.
+ */
 export function versionFor(versions: readonly PlanVersion[], m: Month): PlanVersion | undefined {
   let best: PlanVersion | undefined;
   for (const v of versions) {
     if (v.effectiveFrom > m) continue;
-    if (!best || v.effectiveFrom > best.effectiveFrom ||
-        (v.effectiveFrom === best.effectiveFrom && v.versionNo > best.versionNo)) {
-      best = v;
-    }
+    if (!best || v.versionNo > best.versionNo) best = v;
   }
   return best;
 }

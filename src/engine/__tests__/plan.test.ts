@@ -125,6 +125,13 @@ describe("plan versions", () => {
     expect(versionFor([v2, v1], "2030-01")?.versionNo).toBe(2);
   });
 
+  it("a newer version starting earlier wins over an older one starting later", () => {
+    const v3 = { ...v1, versionNo: 3, effectiveFrom: "2026-02" };
+    expect(versionFor([v1, v2, v3], "2026-01")?.versionNo).toBe(1);
+    expect(versionFor([v1, v2, v3], "2026-02")?.versionNo).toBe(3);
+    expect(versionFor([v1, v2, v3], "2026-06")?.versionNo).toBe(3);
+  });
+
   it("same effective month: the higher version number wins", () => {
     const v3 = { ...v2, versionNo: 3 };
     expect(versionFor([v1, v3, v2], "2026-05")?.versionNo).toBe(3);

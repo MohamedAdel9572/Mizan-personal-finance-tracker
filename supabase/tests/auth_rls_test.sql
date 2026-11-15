@@ -128,8 +128,8 @@ select test.eq(public.save_plan_version(
     '{items,0,amounts}', '[{"month":"2026-06","amount":"28000"},{"month":"2026-09","amount":"35000"}]'),
     '{items,1}', '{"kind":"expense","name":"PS5","recurrence":"recurring","start":"2026-09","end":"2027-08","amounts":[{"month":"2026-09","amount":"3000"}]}')
   )->>'version_no', '2', 'second version saved');
-select test.throws($$select public.save_plan_version(jsonb_set(test.base_plan(), '{effective_from}', '"2026-08"'))$$,
-                   '%can''t start before the current one%', 'new version cannot start before the current one');
+select test.throws($$select public.save_plan_version(jsonb_set(test.base_plan(), '{effective_from}', '"2026-05"'))$$,
+                   '%before the plan start%', 'new version cannot start before the plan start');
 select test.eq((select summary from public.audit_events where event_type = 'plan_version' order by id desc limit 1),
                'Saved plan version 2 (effective 2026-09), added: PS5, removed: Car, edited: Salary', 'history describes the version change');
 select test.eq((select count(*) from public.audit_events where entity = 'actual_entries')::text, '2', 'history has one row per actual');

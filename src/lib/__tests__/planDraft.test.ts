@@ -46,7 +46,7 @@ describe("plan draft", () => {
   });
 
   it("picks a sensible effective month", () => {
-    expect(defaultEffective("2026-11", "2027-03", "2026-11")).toBe("2027-03");
+    expect(defaultEffective("2026-11", "2027-03", "2026-11")).toBe("2026-11"); // an older version starting later no longer pushes the default
     expect(defaultEffective("2027-05", "2027-03", "2026-11")).toBe("2027-05");
     expect(defaultEffective("2026-01", null, "2026-11")).toBe("2026-11");
   });

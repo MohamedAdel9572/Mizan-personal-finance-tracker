@@ -160,11 +160,9 @@ export function draftToPayload(d: Draft, effectiveFrom: Month, note: string): Re
 }
 
 /** Default "effective from" for a new version: this month, but never before the current version or the plan start. */
-export function defaultEffective(current: Month, latestEffective: Month | null, planStart: Month): Month {
-  let m = current;
-  if (latestEffective && m < latestEffective) m = latestEffective;
-  if (m < planStart) m = planStart;
-  return m;
+/** Default "use this version from": this month, but not before the plan starts. (latestEffective is no longer a lower bound.) */
+export function defaultEffective(current: Month, _latestEffective: Month | null, planStart: Month): Month {
+  return current < planStart ? planStart : current;
 }
 
 export function lastPlanMonth(d: Draft): Month | null {
