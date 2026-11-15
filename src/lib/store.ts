@@ -12,6 +12,7 @@ import { Dec } from "../engine/decimal.ts";
 import { valueHoldings } from "../engine/gold.ts";
 import { effectivePrices, toHoldings, type HoldingRow, type PriceRow } from "./gold.ts";
 import { adjustFeed, getGoldFeed, type GoldFeed } from "./goldFeed.ts";
+import type { CardsData } from "./cards.ts";
 
 /** The plan line that means "my gold" (English or Arabic name). */
 export function isGoldLine(name: string): boolean {
@@ -72,6 +73,8 @@ export interface AppData {
   goldValueAt: (month: string) => Dec | null;
   goal: Goal | null;
   settings: Settings;
+  /** cards, their entries and which plan lines they pay (empty before migration 016/017) */
+  cards: CardsData;
 }
 
 export interface Settings {
@@ -87,14 +90,16 @@ export async function loadProfile(api: Api): Promise<Profile | null> {
 }
 
 export async function loadData(api: Api, profile: Profile): Promise<AppData> {
-  const [versionRows, actualRows, goldRows, priceRows, goalRow, settingsRow] = await Promise.all([
+  const [versionRows, actualRows, goldRows, priceRows, goalRow, settingsRow, cardsRow] = await Promise.all([
     api.rpc<(PlanVersionRow & { id: number; note: string; created_at: string })[]>("get_plan_versions"),
     api.rpc<ActualsRow>("get_actuals"),
     api.rpc<HoldingRow[]>("get_gold_holdings").catch(() => [] as HoldingRow[]),
     api.rpc<PriceRow[]>("get_gold_prices").catch(() => [] as PriceRow[]),
     api.rpc<{ target_amount: string; target_month: string; monthly_savings_target: string | null } | null>("get_goal").catch(() => null),
     api.rpc<{ warn_threshold_pct: string; gold_adjust_pct: string } | null>("get_settings").catch(() => null),
+    api.rpc<CardsData | null>("get_cards").catch(() => null),
   ]);
+  const cards: CardsData = { cards: cardsRow?.cards ?? [], txns: cardsRow?.txns ?? [], links: cardsRow?.links ?? [] };
   const settings: Settings = { warnPct: settingsRow?.warn_threshold_pct ?? "5", goldAdjustPct: settingsRow?.gold_adjust_pct ?? "0" };
   const owned = goldRows.filter((g) => !g.sold_date);
   // only ask the internet when there is gold to value
@@ -178,6 +183,7 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
     goldByMonth,
     goldValueAt,
     settings,
+    cards,
     goal: goalRow ? { targetAmount: goalRow.target_amount, targetMonth: goalRow.target_month, monthlySavingsTarget: goalRow.monthly_savings_target } : null,
   };
 }

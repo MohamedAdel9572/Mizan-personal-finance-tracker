@@ -28,7 +28,14 @@ export interface TxnRow {
   date: string; // YYYY-MM-DD
   note: string;
   created_at: string;
+  /** set when the entry pays a plan line for a month (from the Log page) */
+  item_key?: string | null;
+  month?: string | null;
 }
+
+export type LinkMode = "installment" | "monthly";
+export interface LinkRow { item_key: string; card_id: number; mode: LinkMode }
+export interface CardsData { cards: CardRow[]; txns: TxnRow[]; links: LinkRow[] }
 
 export interface HistoryLine {
   txn: TxnRow;

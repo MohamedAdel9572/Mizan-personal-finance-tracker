@@ -39,3 +39,31 @@ select test.act_as(:'tok_k');
 select public.delete_card_txn(:'dt');
 select public.delete_card(:'cc');
 select test.eq(jsonb_array_length(public.get_cards()->'txns')::text, '0', 'deleting a card deletes its history');
+
+-- 017: plan lines paid with a card
+select test.act_as(:'tok_k');
+select public.save_plan_version(test.base_plan());
+select public.save_card(null, '{"name":"Klivvr","kind":"credit","credit_limit":"20000","opening_balance":"11004"}') as kc \gset
+select test.throws($$select public.settle_line('2026-07', '11111111-1111-4111-8111-111111111111', '917', 'card')$$, '%isn''t linked%', 'card needs a link');
+select public.set_card_link('11111111-1111-4111-8111-111111111111', :'kc', 'installment');
+select test.eq(public.get_cards()#>>'{links,0,mode}', 'installment', 'link saved');
+select public.settle_line('2026-07', '11111111-1111-4111-8111-111111111111', '917', 'card');
+select test.eq((select amount::text from public.actual_entries where month = '2026-07-01'), '917.00', 'actual logged');
+select test.eq((select kind || ' ' || amount from public.card_txns where month = '2026-07-01'), 'payment 917.00', 'installment = payment on the card');
+select public.settle_line('2026-07', '11111111-1111-4111-8111-111111111111', '917', 'card');
+select test.eq((select count(*)::text from public.card_txns where month = '2026-07-01'), '1', 'settling again does not duplicate');
+select public.save_checkin('2026-07', '[{"item_key": "11111111-1111-4111-8111-111111111111", "amount": "950"}]');
+select test.eq((select amount::text from public.card_txns where month = '2026-07-01'), '950.00', 'changing the actual updates the card entry');
+select public.settle_line('2026-07', '11111111-1111-4111-8111-111111111111', '950', 'cash');
+select test.eq((select count(*)::text from public.card_txns where month = '2026-07-01'), '0', 'paid cash removes the card entry');
+select public.set_card_link('11111111-1111-4111-8111-111111111111', :'kc', 'monthly');
+select public.settle_line('2026-08', '11111111-1111-4111-8111-111111111111', '1000', 'card');
+select test.eq((select kind from public.card_txns where month = '2026-08-01'), 'spend', 'monthly = spend on the card');
+select public.clear_month('2026-08');
+select test.eq((select count(*)::text from public.card_txns where month = '2026-08-01'), '0', 'clearing the month removes the card entry');
+select public.set_card_link('11111111-1111-4111-8111-111111111111', null);
+select test.eq(jsonb_array_length(public.get_cards()->'links')::text, '0', 'link removed');
+select test.act_as(:'tok_l');
+select test.throws(format('select public.set_card_link(%L, %s, %L)', '11111111-1111-4111-8111-111111111111', :'kc', 'installment'), '%not found%', 'L cannot link to K''s card');
+select test.act_as(:'tok_k');
+select public.delete_plan();

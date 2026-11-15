@@ -3,14 +3,12 @@
 import { Dec } from "../engine/decimal.ts";
 import { currentMonth } from "../engine/month.ts";
 import { ApiError } from "../lib/api.ts";
-import { CARD_COLORS, cardState, daysUntil, nextDue, type CardRow, type CardState, type TxnKind, type TxnRow } from "../lib/cards.ts";
+import { CARD_COLORS, cardState, daysUntil, nextDue, type CardRow, type CardsData, type CardState, type LinkMode, type TxnKind, type TxnRow } from "../lib/cards.ts";
 import { busy, emptyState, esc, formError, formValues, openDialog, toast } from "../lib/dom.ts";
 import { money, monthLabel } from "../lib/format.ts";
 import { lineChart, compact } from "./charts.ts";
-import { loadingHtml } from "./shell.ts";
+import { LOG_BASE } from "./log.ts";
 import type { Ctx } from "./context.ts";
-
-interface CardsData { cards: CardRow[]; txns: TxnRow[] }
 
 const AMOUNT_RE = /^\d{1,14}(\.\d{1,2})?$/;
 const HEAD = `<div class="page-head"><div><h1>Cards</h1><p class="muted small">Your credit and debit cards, what's left on each, and every spend and payment.</p></div>
@@ -22,22 +20,13 @@ function today(): string {
 const n2 = (d: Dec) => money(d, d.round(0).eq(d) ? 0 : 2);
 
 export function renderCards(root: HTMLElement, ctx: Ctx): void {
-  root.innerHTML = HEAD + loadingHtml();
-  ctx.api.rpc<CardsData | null>("get_cards")
-    .then((data) => draw(root, ctx, data ?? { cards: [], txns: [] }))
-    .catch((e) => {
-      const missing = e instanceof ApiError && /get_cards|PGRST202|not find/i.test(e.message);
-      root.innerHTML = HEAD + `<div class="alert danger">${missing
-        ? "Cards need a database update: run <code>016_cards.sql</code> in the Supabase SQL editor, then reload."
-        : "Couldn't load your cards."}</div>`;
-      if (!missing) ctx.fail(e);
-    });
+  draw(root, ctx, ctx.data.cards);
 }
 
 function draw(root: HTMLElement, ctx: Ctx, data: CardsData): void {
   const month = currentMonth();
   const t = today();
-  const reload = () => renderCards(root, ctx);
+  const reload = () => void ctx.reload();
   if (data.cards.length === 0) {
     root.innerHTML = HEAD + emptyState("No cards yet", "Add a credit card to see its limit, what you've used and what's left, or a debit card to track its balance.");
     wireAdd(root, ctx, reload);
@@ -61,7 +50,7 @@ function draw(root: HTMLElement, ctx: Ctx, data: CardsData): void {
 
   root.innerHTML = HEAD + totals + `
     <div class="wallet" role="tablist" aria-label="Your cards">${states.map((s) => plastic(s, s === sel)).join("")}</div>
-    ${detail(sel, t)}`;
+    ${detail(sel, t, linesHtml(ctx, sel))}`;
 
   wireAdd(root, ctx, reload);
   root.querySelectorAll<HTMLElement>("[data-card]").forEach((b) => b.addEventListener("click", () => {
@@ -75,6 +64,15 @@ function draw(root: HTMLElement, ctx: Ctx, data: CardsData): void {
     if (line) editTxn(ctx, sel, line.txn, line.txn.kind, reload);
   }));
   root.querySelector("[data-edit-card]")?.addEventListener("click", () => editCard(ctx, sel, reload));
+  root.querySelector("[data-link-line]")?.addEventListener("click", () => linkLine(ctx, sel.card, reload));
+  root.querySelectorAll<HTMLElement>("[data-unlink]").forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm("Stop paying this line with this card? Entries already on the card stay.")) return;
+    try {
+      await ctx.api.rpc("set_card_link", { p_item_key: b.dataset.unlink, p_card_id: null });
+      toast("Line unlinked.", "ok");
+      reload();
+    } catch (e) { ctx.fail(e); }
+  }));
 
   const chartEl = root.querySelector<HTMLElement>("#card-chart");
   if (chartEl) {
@@ -127,7 +125,7 @@ function ring(u: number): string {
   </svg>`;
 }
 
-function detail(s: CardState, t: string): string {
+function detail(s: CardState, t: string, lines: string): string {
   const c = s.card;
   const credit = !!s.limit;
   const due = credit && c.due_day ? nextDue(c.due_day, t) : null;
@@ -166,12 +164,13 @@ function detail(s: CardState, t: string): string {
       <h2>${esc(c.name)}${c.last4 ? ` <span class="muted small">•••• ${esc(c.last4)}</span>` : ""}</h2>
       <div class="cd-actions">
         <button class="btn primary small" data-txn-kind="spend">− Spend</button>
-        <button class="btn ghost small" data-txn-kind="payment">+ ${credit ? "Payment" : "Deposit"}</button>
+        <button class="btn ghost small" data-txn-kind="payment">+ ${credit ? "Pay bill" : "Deposit"}</button>
         <button class="btn ghost small" data-txn-kind="refund">Refund</button>
         <button class="btn ghost small" data-edit-card>Edit card</button>
       </div>
     </div>
     <div class="cd-stats${credit ? "" : " debit"}">${stats}</div>
+    ${lines}
     ${s.history.length >= 2 ? `<div class="card chart-card"><h3>${credit ? "Available" : "Balance"} over time</h3><div class="chart" id="card-chart"></div></div>` : ""}
     <div class="card tx-card">
       <h3>History</h3>
@@ -268,8 +267,8 @@ function editCard(ctx: Ctx, state: CardState | null, reload: () => void): void {
           } });
           dialog.close();
           toast(card ? "Card saved." : "Card added.", "ok");
+          await ctx.reload();
           if (!card) ctx.navigate(`#/cards/${id}`);
-          else reload();
         } catch (ex) { fail(ctx, dialog, form, ex, "Could not save the card."); }
       });
     });
@@ -279,6 +278,7 @@ function editCard(ctx: Ctx, state: CardState | null, reload: () => void): void {
         await ctx.api.rpc("delete_card", { p_id: card.id });
         dialog.close();
         toast("Card deleted.", "ok");
+        await ctx.reload();
         ctx.navigate("#/cards");
       } catch (ex) { fail(ctx, dialog, form, ex, "Could not delete the card."); }
     });
@@ -290,6 +290,8 @@ function editTxn(ctx: Ctx, s: CardState, txn: TxnRow | null, kind: TxnKind, relo
   const credit = !!s.limit;
   const t = today();
   const word = (k: TxnKind) => (k === "spend" ? "Spend" : k === "refund" ? "Refund" : credit ? "Payment" : "Deposit");
+  // paying a credit card bill: start with everything used; change it for a part payment
+  const billDue = !txn && credit && kind === "payment" && s.used.gt(0) ? s.used : null;
   openDialog(`
     <form id="txn-form" novalidate>
       <h2>${txn ? "Edit entry" : `${word(kind)} · ${esc(s.card.name)}`}</h2>
@@ -297,10 +299,12 @@ function editTxn(ctx: Ctx, s: CardState, txn: TxnRow | null, kind: TxnKind, relo
         ${(["spend", "payment", "refund"] as const).map((k) => `<label><input type="radio" name="kind" value="${k}"${k === kind ? " checked" : ""}><span>${word(k)}</span></label>`).join("")}
       </div>
       <div class="row-2">
-        <label>Amount (EGP)<input name="amount" inputmode="decimal" data-num="money" value="${esc(txn ? Dec.of(txn.amount).toString() : "")}" placeholder="0" required></label>
+        <label>Amount (EGP)<input name="amount" inputmode="decimal" data-num="money" value="${esc(txn ? Dec.of(txn.amount).toString() : billDue ? billDue.round(2).toString() : "")}" placeholder="0" required></label>
         <label>Date<input name="date" type="date" max="${t}" value="${esc(txn?.date ?? t)}" required></label>
       </div>
       <label>Note <span class="muted small">(optional)</span><input name="note" maxlength="120" value="${esc(txn?.note ?? "")}" placeholder="${kind === "spend" ? "Carrefour" : credit ? "November bill" : "Salary"}"></label>
+      ${billDue ? `<p class="muted small">Filled with the full amount used (${n2(billDue)}). Change it to pay part of the bill.</p>` : ""}
+      ${txn?.item_key ? `<p class="notice small">This entry pays a plan line for ${esc(monthLabel(txn.month ?? txn.date.slice(0, 7), true))}. Changing the amount on the Log page changes it here too.</p>` : ""}
       <p class="muted small" id="txn-preview"></p>
       <div class="dialog-actions">
         ${txn ? `<button type="button" class="btn ghost danger-text" id="delete-txn">Delete</button><span class="spacer"></span>` : ""}
@@ -349,6 +353,84 @@ function editTxn(ctx: Ctx, s: CardState, txn: TxnRow | null, kind: TxnKind, relo
         toast("Entry deleted.", "ok");
         reload();
       } catch (ex) { fail(ctx, dialog, form, ex, "Could not delete."); }
+    });
+  });
+}
+
+/** Plan lines paid with this card, with this month's status. */
+function linesHtml(ctx: Ctx, s: CardState): string {
+  const t = ctx.data.timeline;
+  if (!t) return "";
+  const month = currentMonth();
+  const mine = ctx.data.cards.links.filter((l) => l.card_id === s.card.id);
+  const planned = t.planned(month);
+  const rows = mine.map((l) => {
+    const info = t.lineInfo(l.item_key);
+    const amt = planned?.lines.get(l.item_key) ?? Dec.ZERO;
+    const onCard = ctx.data.cards.txns.find((x) => x.item_key === l.item_key && x.month === month);
+    const logged = ctx.data.entries.get(month)?.get(l.item_key);
+    const status = amt.isZero() && !logged ? `<span class="pill muted-pill">Nothing this month</span>`
+      : onCard ? `<span class="pill ok-pill">${l.mode === "installment" ? "Paid" : "Charged"} ${n2(Dec.of(onCard.amount))}</span>`
+      : logged ? `<span class="pill muted-pill">Paid cash</span>`
+      : `<span class="pill due-pill">Due ${n2(amt)}</span>`;
+    return `<li class="ln">
+      <span class="ln-main"><span class="ln-name">${esc(info?.name ?? "Removed line")}</span>
+        <span class="muted small">${l.mode === "installment" ? "Installment: each payment adds back to what's available" : "Charged to the card every month"}</span></span>
+      ${status}
+      <button type="button" class="icon-btn danger" data-unlink="${esc(l.item_key)}" aria-label="Unlink ${esc(info?.name ?? "line")}">×</button>
+    </li>`;
+  }).join("");
+  const anyDue = mine.some((l) => !ctx.data.cards.txns.some((x) => x.item_key === l.item_key && x.month === month)
+    && !ctx.data.entries.get(month)?.get(l.item_key) && !(planned?.lines.get(l.item_key) ?? Dec.ZERO).isZero());
+  return `<div class="card lines-card">
+    <div class="section-head"><h3>Plan lines on this card</h3><button type="button" class="btn ghost small" data-link-line>+ Link a line</button></div>
+    ${mine.length ? `<ul class="ln-list">${rows}</ul>
+      <p class="muted small ln-foot">Each month, the Log page asks if these were paid with this card or cash.
+        ${anyDue ? `<a href="${LOG_BASE}${month}">Log ${esc(monthLabel(month, true))} →</a>` : ""}</p>`
+      : `<p class="muted small">Link a plan line (like an installment or a subscription) and the Log page will add it to this card when you log the month.</p>`}
+  </div>`;
+}
+
+function linkLine(ctx: Ctx, card: CardRow, reload: () => void): void {
+  const latest = ctx.data.versions[0]?.version;
+  const lines = latest?.items.filter((i) => i.kind === "expense") ?? [];
+  if (!lines.length) { toast("Add expense lines to your plan first.", "info"); return; }
+  const linkOf = (key: string) => ctx.data.cards.links.find((l) => l.item_key === key);
+  const cardName = (id: number) => ctx.data.cards.cards.find((c) => c.id === id)?.name ?? "another card";
+  openDialog(`
+    <form id="link-form" novalidate>
+      <h2>Link a plan line to ${esc(card.name)}</h2>
+      <label>Plan line<select name="item">${lines.map((i) => {
+        const l = linkOf(i.key);
+        return `<option value="${esc(i.key)}"${l?.card_id === card.id ? " disabled" : ""}>${esc(i.name)}${l ? ` (on ${esc(cardName(l.card_id))})` : ""}</option>`;
+      }).join("")}</select></label>
+      <fieldset class="link-modes"><legend>How the card is used</legend>
+        <label class="radio-card"><input type="radio" name="mode" value="installment" checked>
+          <span><strong>Installment</strong><span class="muted small">The full price is already taken from the limit. Each month's payment adds it back (e.g. a tablet on installments).</span></span></label>
+        ${card.kind === "credit" ? `<label class="radio-card"><input type="radio" name="mode" value="monthly">
+          <span><strong>Charged monthly</strong><span class="muted small">The card is charged every month (e.g. a subscription). You pay the bill later with Pay bill.</span></span></label>` : ""}
+      </fieldset>
+      <div class="dialog-actions">
+        <button type="button" class="btn ghost" data-close>Cancel</button>
+        <button type="submit" class="btn primary">Link</button>
+      </div>
+    </form>`, (dialog) => {
+    const form = dialog.querySelector<HTMLFormElement>("#link-form")!;
+    const first = form.querySelector<HTMLSelectElement>("select")!;
+    const ok = [...first.options].find((o) => !o.disabled);
+    if (ok) first.value = ok.value;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = formValues(form);
+      if (!f.item) return formError(form, "Pick a plan line.");
+      await busy(form, async () => {
+        try {
+          await ctx.api.rpc("set_card_link", { p_item_key: f.item, p_card_id: card.id, p_mode: (f.mode ?? "installment") as LinkMode });
+          dialog.close();
+          toast("Line linked.", "ok");
+          reload();
+        } catch (ex) { fail(ctx, dialog, form, ex, "Could not link the line."); }
+      });
     });
   });
 }

@@ -15,7 +15,10 @@ function stashForm(month: Month): void {
   const form = document.querySelector<HTMLFormElement>("#checkin");
   if (!form) return;
   const values = new Map<string, string>();
-  form.querySelectorAll<HTMLInputElement>("input[name]").forEach((i) => values.set(i.name, i.value));
+  form.querySelectorAll<HTMLInputElement>("input[name]").forEach((i) => {
+    if (i.type === "radio") { if (i.checked) values.set(`radio:${i.name}`, i.value); }
+    else values.set(i.name, i.value);
+  });
   stash = { month, values };
 }
 
@@ -58,14 +61,33 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
   }
   for (const key of existing?.keys() ?? []) if (!keys.includes(key)) keys.push(key);
 
+  // lines paid with a card: choose Card or Cash for this month
+  const { cards, links, txns } = ctx.data.cards;
+  const linkOf = (key: string) => {
+    const l = links.find((x) => x.item_key === key);
+    const card = l && cards.find((c) => c.id === l.card_id);
+    return l && card ? { link: l, card } : null;
+  };
+  const viaFor = (key: string): "card" | "cash" => {
+    if (txns.some((x) => x.item_key === key && x.month === month)) return "card";
+    return existing?.has(key) ? "cash" : "card";
+  };
   const lineRow = (key: string) => {
     const info = t.lineInfo(key)!;
     const p = planned.lines.get(key) ?? Dec.ZERO;
     const value = existing?.get(key) ?? (checkin ? "0" : p.toFixed(2));
+    const lk = info.kind === "expense" ? linkOf(key) : null;
+    const via = lk ? viaFor(key) : null;
     return `<div class="log-line">
       <label for="l-${esc(key)}"><span class="line-name">${esc(info.name)}</span><span class="muted small">planned ${money(p)}</span></label>
       <input id="l-${esc(key)}" name="line:${esc(key)}" inputmode="decimal" value="${esc(Dec.of(value).toString())}" data-planned="${esc(p.toString())}" data-kind="${info.kind}">
       <span class="gap small" data-gap-for="${esc(key)}"></span>
+      ${lk ? `<div class="via" role="radiogroup" aria-label="How ${esc(info.name)} was paid">
+        <span class="muted small">Paid with</span>
+        <span class="seg via-seg">
+          <label><input type="radio" name="via:${esc(key)}" value="card"${via === "card" ? " checked" : ""}><span>${esc(lk.card.name)}${lk.link.mode === "installment" ? " · installment" : ""}</span></label>
+          <label><input type="radio" name="via:${esc(key)}" value="cash"${via === "cash" ? " checked" : ""}><span>Cash</span></label>
+        </span></div>` : ""}
     </div>`;
   };
   const group = (kind: "income" | "expense", title: string) => {
@@ -117,6 +139,11 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
   const form = root.querySelector<HTMLFormElement>("#checkin")!;
   if (stash?.month === month) {
     for (const [name, value] of stash.values) {
+      if (name.startsWith("radio:")) {
+        const r = form.querySelector<HTMLInputElement>(`input[name="${CSS.escape(name.slice(6))}"][value="${CSS.escape(value)}"]`);
+        if (r) r.checked = true;
+        continue;
+      }
       const el = form.querySelector<HTMLInputElement>(`input[name="${CSS.escape(name)}"]`);
       if (el) el.value = value;
     }
@@ -188,6 +215,13 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
           }
           throw err;
         });
+        // lines paid with a card: add (or remove) the entry on the card for this month
+        for (const i of inputs) {
+          const key = i.name.slice(5);
+          const via = form.querySelector<HTMLInputElement>(`input[name="via:${CSS.escape(key)}"]:checked`)?.value;
+          if (!via) continue;
+          await ctx.api.rpc("settle_line", { p_month: month, p_item_key: key, p_amount: cleanAmount(i.value), p_via: via });
+        }
         await ctx.reload();
         toast(`${monthLabel(month, true)} saved.`, "ok");
         planReturn.tab = "actual";
