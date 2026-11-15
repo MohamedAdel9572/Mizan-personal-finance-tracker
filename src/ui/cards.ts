@@ -393,17 +393,17 @@ function linesHtml(ctx: Ctx, s: CardState): string {
 
 function linkLine(ctx: Ctx, card: CardRow, reload: () => void): void {
   const latest = ctx.data.versions[0]?.version;
-  const lines = latest?.items.filter((i) => i.kind === "expense") ?? [];
-  if (!lines.length) { toast("Add expense lines to your plan first.", "info"); return; }
-  const linkOf = (key: string) => ctx.data.cards.links.find((l) => l.item_key === key);
-  const cardName = (id: number) => ctx.data.cards.cards.find((c) => c.id === id)?.name ?? "another card";
+  const expenses = latest?.items.filter((i) => i.kind === "expense") ?? [];
+  if (!expenses.length) { toast("Add expense lines to your plan first.", "info"); return; }
+  // a line belongs to one card: lines already linked are hidden until they're unlinked
+  const linked = new Set(ctx.data.cards.links.map((l) => l.item_key));
+  const lines = expenses.filter((i) => !linked.has(i.key));
+  if (!lines.length) { toast("Every expense line is already linked to a card. Unlink one first.", "info"); return; }
   openDialog(`
     <form id="link-form" novalidate>
       <h2>Link a plan line to ${esc(card.name)}</h2>
-      <label>Plan line<select name="item">${lines.map((i) => {
-        const l = linkOf(i.key);
-        return `<option value="${esc(i.key)}"${l?.card_id === card.id ? " disabled" : ""}>${esc(i.name)}${l ? ` (on ${esc(cardName(l.card_id))})` : ""}</option>`;
-      }).join("")}</select></label>
+      <label>Plan line<select name="item">${lines.map((i) => `<option value="${esc(i.key)}">${esc(i.name)}</option>`).join("")}</select></label>
+      ${linked.size ? `<p class="muted small">Lines already on a card aren't listed. Unlink them there first.</p>` : ""}
       <fieldset class="link-modes"><legend>How the card is used</legend>
         <label class="radio-card"><input type="radio" name="mode" value="installment" checked>
           <span><strong>Installment</strong><span class="muted small">The full price is already taken from the limit. Each month's payment adds it back (e.g. a tablet on installments).</span></span></label>
@@ -416,9 +416,6 @@ function linkLine(ctx: Ctx, card: CardRow, reload: () => void): void {
       </div>
     </form>`, (dialog) => {
     const form = dialog.querySelector<HTMLFormElement>("#link-form")!;
-    const first = form.querySelector<HTMLSelectElement>("select")!;
-    const ok = [...first.options].find((o) => !o.disabled);
-    if (ok) first.value = ok.value;
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const f = formValues(form);
