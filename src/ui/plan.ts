@@ -468,6 +468,7 @@ function versionLabel(x: VersionInfo): string {
 
 let draft: Draft | null = null;
 let dirty = false;
+let shownProblems: ReturnType<typeof validateDraft> = [];
 
 export function hasUnsavedPlan(): boolean {
   return dirty;
@@ -478,6 +479,7 @@ export function discardPlanDraft(): void {
   dirty = false;
   openItems.clear();
   settingsOpen = false;
+  shownProblems = [];
 }
 
 /** lines whose editor is open (indexes into draft.items) and whether the plan settings are open */
@@ -644,6 +646,23 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
   const form = root.querySelector<HTMLFormElement>("#plan-editor")!;
   const rerender = () => renderEditor(root, ctx, false);
 
+  // problems from the last Save stay listed while you open lines to fix them
+  if (shownProblems.length) {
+    const box = root.querySelector<HTMLElement>("#problems")!;
+    box.innerHTML = `<div class="alert danger" role="alert"><strong>Please fix ${shownProblems.length === 1 ? "this" : `these ${shownProblems.length} things`}:</strong><ul>${shownProblems.slice(0, 12).map((p) => `<li>${p.item !== null ? `<a href="#item-${p.item}" data-jump="${p.item}">${esc(p.message)}</a>` : `<a href="#" data-jump-settings>${esc(p.message)}</a>`}</li>`).join("")}</ul></div>`;
+    shownProblems.forEach((p) => p.item !== null && root.querySelector(`#item-${p.item}`)?.classList.add("invalid"));
+    box.addEventListener("click", (ev) => {
+      const link = (ev.target as HTMLElement).closest<HTMLAnchorElement>("a");
+      if (!link) return;
+      ev.preventDefault();
+      openItems.clear();
+      settingsOpen = link.dataset.jumpSettings !== undefined;
+      if (link.dataset.jump !== undefined) openItems.add(Number(link.dataset.jump));
+      rerender();
+      root.querySelector(link.dataset.jump !== undefined ? `#item-${link.dataset.jump}` : ".settings-open")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
+
   // typing: update the draft without re-rendering (keeps focus and cursor)
   form.addEventListener("input", (e) => {
     const el = e.target as HTMLInputElement | HTMLSelectElement;
@@ -702,8 +721,8 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
     const month = d.start && isMonth(d.start) ? defaultEffective(currentMonth(), null, d.start) : currentMonth();
     if (ds.openItem !== undefined || ds.closeItem !== undefined) {
       const i = Number(ds.openItem ?? ds.closeItem);
-      if (ds.openItem !== undefined) openItems.add(i);
-      else openItems.delete(i);
+      openItems.clear(); // one block open at a time
+      if (ds.openItem !== undefined) { openItems.add(i); settingsOpen = false; }
       rerender();
       const el = root.querySelector<HTMLElement>(`#item-${i}`);
       if (ds.openItem !== undefined) el?.querySelector<HTMLInputElement>(".item-name")?.focus({ preventScroll: true });
@@ -711,14 +730,18 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
       el?.scrollIntoView({ block: "nearest" });
     } else if (ds.openSettings !== undefined || ds.closeSettings !== undefined) {
       settingsOpen = ds.openSettings !== undefined;
+      openItems.clear();
       rerender();
     } else if (ds.addItem) {
       d.items.push(newItem(ds.addItem as DraftItem["kind"], month));
+      openItems.clear();
+      settingsOpen = false;
       openItems.add(d.items.length - 1);
       dirty = true;
       rerender();
       root.querySelector<HTMLInputElement>(`#item-${d.items.length - 1} .item-name`)?.focus();
     } else if (ds.delItem) {
+      shownProblems = []; // line numbers shift; the list comes back on the next Save
       const item = d.items[Number(ds.delItem)]!;
       const msg = item.key
         ? `Remove "${item.name}" from the plan? Earlier versions and your logged actuals for it are kept.`
@@ -763,24 +786,18 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const problems = validateDraft(d);
+    shownProblems = problems;
     if (problems.length) {
-      // open every line with a problem so the boxes to fix are visible
-      problems.forEach((p) => p.item !== null && openItems.add(p.item));
-      if (problems.some((p) => p.item === null)) settingsOpen = true;
+      // open the first block with a problem (one block open at a time)
+      openItems.clear();
+      const first = problems[0]!;
+      settingsOpen = first.item === null;
+      if (first.item !== null) openItems.add(first.item);
       rerender();
-    }
-    const box = root.querySelector<HTMLElement>("#problems")!;
-    if (problems.length) {
-      box.innerHTML = `<div class="alert danger" role="alert"><strong>Please fix ${problems.length === 1 ? "this" : `these ${problems.length} things`}:</strong><ul>${problems.slice(0, 12).map((p) => `<li>${p.item !== null ? `<a href="#item-${p.item}" data-jump="${p.item}">${esc(p.message)}</a>` : esc(p.message)}</li>`).join("")}</ul></div>`;
-      problems.forEach((p) => p.item !== null && root.querySelector(`#item-${p.item}`)?.classList.add("invalid"));
-      box.querySelectorAll<HTMLAnchorElement>("[data-jump]").forEach((a) => a.addEventListener("click", (ev) => {
-        ev.preventDefault();
-        root.querySelector(`#item-${a.dataset.jump}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }));
-      box.scrollIntoView({ behavior: "smooth", block: "start" });
+      root.querySelector("#problems")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
-    box.innerHTML = "";
+    root.querySelector("#problems")!.innerHTML = "";
     askEffectiveAndSave(ctx, d, latest ?? null);
   });
 }
