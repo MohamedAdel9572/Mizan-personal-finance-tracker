@@ -107,7 +107,7 @@ function plastic(s: CardState, on: boolean): string {
   <button type="button" class="pcard pc-${esc(c.color)}${on ? " on" : ""}" data-card="${c.id}" role="tab" aria-selected="${on}">
     <span class="pc-top"><span class="pc-bank">${esc(c.bank || (credit ? "Credit card" : "Debit card"))}</span><span class="pc-kind">${credit ? "Credit" : "Debit"}</span></span>
     <span class="pc-chip" aria-hidden="true"></span>
-    <span class="pc-num">•••• ${esc(c.last4 ?? "····")}</span>
+    <span class="pc-num"><span>••••</span><span>••••</span><span>••••</span><span>${esc(c.last4 ?? "••••")}</span></span>
     <span class="pc-bottom">
       <span class="pc-name">${esc(c.name)}</span>
       <span class="pc-amt"><small>${credit ? "Available" : "Balance"}</small>${n2(s.available)}</span>
@@ -218,8 +218,9 @@ function editCard(ctx: Ctx, state: CardState | null, reload: () => void): void {
       </div>
       <div class="row-2">
         <label class="only-credit">Credit limit (EGP)<input name="credit_limit" inputmode="decimal" data-num="money" value="${esc(card?.credit_limit ? Dec.of(card.credit_limit).toString() : "")}" placeholder="50000"></label>
-        <label><span class="lbl-credit">Current balance (EGP) <span class="muted small">available to spend</span></span><span class="lbl-debit">Current balance (EGP)</span><input name="current" inputmode="decimal" data-num="money" value="${esc(state ? state.available.round(2).toString() : "")}" placeholder="${kind === "credit" ? "same as the limit if unused" : "0"}"></label>
+        <label><span class="lbl-credit">Current balance (EGP)</span><span class="lbl-debit">Current balance (EGP)</span><input name="current" inputmode="decimal" data-num="money" value="${esc(state ? state.available.round(2).toString() : "")}" placeholder="${kind === "credit" ? "same as the limit if unused" : "0"}"></label>
       </div>
+      <p class="muted small form-hint">Current balance is what you can spend now, as your bank app shows it.</p>
       <fieldset class="swatches"><legend>Colour</legend>${colors}</fieldset>
       <p class="muted small">Only the last 4 digits are saved. Never type the full card number.</p>
       <div class="dialog-actions">
