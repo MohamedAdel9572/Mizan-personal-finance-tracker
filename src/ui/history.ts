@@ -7,12 +7,13 @@ import type { Ctx } from "./context.ts";
 
 interface Event { id: number; at: string; type: string; entity: string; month: string | null; summary: string }
 
-type Category = "plan" | "actuals" | "unplanned" | "gold" | "import" | "other";
+type Category = "plan" | "actuals" | "unplanned" | "gold" | "cards" | "import" | "other";
 const CATEGORY: Record<Category, { label: string; icon: string }> = {
   plan: { label: "Plan", icon: "▦" },
   actuals: { label: "Actuals", icon: "✓" },
   unplanned: { label: "Unplanned", icon: "!" },
   gold: { label: "Gold", icon: "◆" },
+  cards: { label: "Cards", icon: "▭" },
   import: { label: "Imports", icon: "⇪" },
   other: { label: "Settings & goal", icon: "⚙" },
 };
@@ -27,6 +28,7 @@ function category(e: Event): Category {
   if (e.entity === "actual_entries" || e.entity === "monthly_checkins") return "actuals";
   if (e.entity === "unplanned_items") return "unplanned";
   if (e.entity.startsWith("gold")) return "gold";
+  if (e.entity === "cards" || e.entity === "card_txns") return "cards";
   return "other";
 }
 

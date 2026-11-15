@@ -4,7 +4,7 @@
 \ir helpers.sql
 set role anon;
 select test.act_as(null);
-select public.app_signup('Jana J', '01400000001', 'password-j1') as tok_j \gset
+select public.app_signup('Jana J', '01477700001', 'password-j1') as tok_j \gset
 select test.act_as(:'tok_j');
 select public.save_plan_version(test.base_plan());
 select test.eq(public.save_plan_version(jsonb_set(test.base_plan(), '{effective_from}', '"2027-05"'))->>'version_no', '2', 'version 2 from a later month');

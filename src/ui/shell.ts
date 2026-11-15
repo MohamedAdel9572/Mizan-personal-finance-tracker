@@ -17,6 +17,7 @@ export const NAV: NavItem[] = [
   { route: "plan", label: "Plan", mobile: true, icon: svg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/>') },
   { route: "plan/log", label: "Log", mobile: true, icon: svg('<path d="M12 5v14M5 12h14"/><circle cx="12" cy="12" r="9"/>') },
   { route: "gold", label: "Gold", mobile: true, icon: svg('<path d="M3 18h18l-3-6H6z"/><path d="M8 12l2-5h4l2 5"/>') },
+  { route: "cards", label: "Cards", mobile: true, icon: svg('<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/>') },
   { route: "history", label: "History", mobile: true, icon: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>') },
 ];
 
