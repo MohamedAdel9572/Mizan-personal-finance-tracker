@@ -133,9 +133,12 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
       ? { ...it, recurrence: "recurring" as const, amounts: [{ month: it.start, amount: goldValue!.toString() }] }
       : it),
   };
+  // With investments, the plan's opening savings = their total at the plan start (it's the same money)
+  const investOpening = invest.accounts.length ? Dec.sum(invest.accounts.map((a) => Dec.of(a.opening))).toString() : null;
+  const withSavings = (v: PlanVersion): PlanVersion => (investOpening === null ? v : { ...v, openingBalance: investOpening });
   const versions: VersionInfo[] = versionRows.map((r) => {
     const raw = versionFromRow(r);
-    return { id: r.id, version: withGold(raw), rawVersion: raw, note: r.note, createdAt: r.created_at };
+    return { id: r.id, version: withSavings(withGold(raw)), rawVersion: raw, note: r.note, createdAt: r.created_at };
   });
   const timeline = versions.length ? new PlanTimeline(versions.map((v) => v.version)) : null;
 

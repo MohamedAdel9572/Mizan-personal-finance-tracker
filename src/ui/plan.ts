@@ -528,6 +528,9 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
   }
   const d = draft;
   const end = lastPlanMonth(d);
+  // with investments, opening savings come from the Investments & savings page
+  const inv = ctx.data.invest.accounts;
+  if (inv.length) d.openingBalance = Dec.sum(inv.map((a) => Dec.of(a.opening))).toString();
 
   const amountRow = (item: DraftItem, i: number, a: { month: string; amount: string }, j: number) => {
     const fixedFirst = item.recurrence === "recurring" && j === 0;
@@ -616,7 +619,8 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
           <div class="row-3">
             <label>Start month<input type="month" data-f="start" value="${esc(d.start)}"></label>
             <label>Length (months)<input inputmode="numeric" data-f="horizonMonths" value="${esc(d.horizonMonths)}"></label>
-            <label>Opening savings (EGP) <span class="muted small">(optional)</span><input inputmode="decimal" data-f="openingBalance" value="${esc(d.openingBalance)}" placeholder="0"></label>
+            ${inv.length ? `<div class="from-invest"><span class="lbl">Opening savings</span><strong>${shownAmount(d.openingBalance)} EGP</strong><a class="small" href="#/invest">from Investments &amp; savings</a></div>`
+              : `<label>Opening savings (EGP) <span class="muted small">(optional)</span><input inputmode="decimal" data-f="openingBalance" value="${esc(d.openingBalance)}" placeholder="0"></label>`}
           </div>
           ${end ? `<p class="muted small">Plan runs to ${esc(monthLabel(end, true))}.</p>` : ""}
           <div class="amounts">
@@ -628,7 +632,7 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
               </div>`).join("")}
             <button type="button" class="btn ghost small" data-add-rate>+ Rate changes from…</button>
           </div>
-          <p class="muted small">Interest is only the plan's estimate. Months you log on the <a href="#/invest">Investments</a> page use your real profit / loss instead, so you can leave it empty.</p>
+          <p class="muted small">Interest is only the plan's estimate. Months you log on the <a href="#/invest">Investments &amp; savings</a> page use your real profit / loss instead, so you can leave it empty.</p>
           <div class="item-done"><button type="button" class="btn ghost small" data-close-settings>Done</button></div>
         </fieldset>` : `
         <div class="item-row settings-row">

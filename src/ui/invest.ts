@@ -17,8 +17,8 @@ const clean = (v: string | undefined) => (v ?? "").replace(/[,\s]/g, "");
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date());
 const n2 = (d: Dec) => money(d, d.round(0).eq(d) ? 0 : 2);
 
-const HEAD = (actions: string) => `<div class="page-head"><div><h1>Investments</h1>
-  <p class="muted small">Where your savings sit. Log each one's profit or loss every month; together they're your plan's real Interest.</p></div>
+const HEAD = (actions: string) => `<div class="page-head"><div><h1>Investments &amp; savings</h1>
+  <p class="muted small">Where your savings sit. Together at the plan start they're your plan's opening savings, and their monthly profit or loss is its real Interest.</p></div>
   <div class="head-actions">${actions}</div></div>`;
 
 export function renderInvest(root: HTMLElement, ctx: Ctx): void {
@@ -32,7 +32,7 @@ export function renderInvest(root: HTMLElement, ctx: Ctx): void {
   const opening = Dec.of(t.first.openingBalance);
   if (!data.accounts.length) {
     root.innerHTML = HEAD(`<button class="btn primary" data-add>+ Add investment</button>`) + emptyState("Where are your savings?",
-      `Add each place your savings sit, for example "Mashreq daily profit" or "Thndr". Your plan starts with ${money(opening)} EGP of savings: put it in the first one.`);
+      `Add each place your savings sit, for example "Mashreq daily profit" or "Thndr". ${opening.gt(0) ? `Your plan starts with ${money(opening)} EGP of savings: it's filled in for the first one.` : "Their total at the plan start becomes your plan's opening savings."}`);
     root.querySelector("[data-add]")?.addEventListener("click", () => editAccount(ctx, null, opening, reload));
     return;
   }
@@ -48,11 +48,10 @@ export function renderInvest(root: HTMLElement, ctx: Ctx): void {
   const openSum = Dec.sum(data.accounts.map((a) => Dec.of(a.opening)));
   const logMonth = isMonth(ctx.params[0] ?? "") && ctx.params[0]! >= t.start && ctx.params[0]! <= upto ? ctx.params[0]! : upto;
 
-  const mismatch = !openSum.eq(opening) ? `<div class="alert warning small">Your investments had <strong>${money(openSum)}</strong> at the plan start (${esc(monthLabel(t.start, true))}), but your plan starts with <strong>${money(opening)}</strong> of savings. They're the same money, so make them match: change "Amount at plan start" here, or Opening savings in <a href="#/plan/edit">Edit plan</a>.</div>` : "";
 
-  root.innerHTML = HEAD(`<button class="btn ghost" data-move>⇄ Move money</button><button class="btn primary" data-add>+ Add investment</button>`) + mismatch + `
+  root.innerHTML = HEAD(`<button class="btn ghost" data-move>⇄ Move money</button><button class="btn primary" data-add>+ Add investment</button>`) + `
     <div class="inv-sum">
-      <div class="card stat"><span class="stat-label">Total now</span><span class="stat-value num">${money(total)} <span class="unit">EGP</span></span><span class="small muted">all investments = your savings</span></div>
+      <div class="card stat"><span class="stat-label">Total now</span><span class="stat-value num">${money(total)} <span class="unit">EGP</span></span><span class="small muted">${money(openSum)} at the plan start = your opening savings</span></div>
       <div class="card stat"><span class="stat-label">Profit / loss so far</span><span class="stat-value num ${allProfit.isNegative() ? "neg" : allProfit.gt(0) ? "pos" : ""}">${signed(allProfit)}</span><span class="small muted">since ${esc(monthLabel(t.start, true))}</span></div>
     </div>
     <div class="inv-grid">${data.accounts.map((a) => accountTile(a, led.get(a.id) ?? [])).join("")}</div>
@@ -239,7 +238,7 @@ function editAccount(ctx: Ctx, a: InvestAccount | null, suggestOpening: Dec, rel
       <label>Name<input name="name" maxlength="60" value="${esc(a?.name ?? "")}" placeholder="${first ? "Mashreq daily profit" : "Thndr"}" required></label>
       <label>Amount at plan start (${esc(monthLabel(t.start, true))}), EGP
         <input name="opening" inputmode="decimal" data-num="money" value="${esc(a ? Dec.of(a.opening).toString() : suggestOpening.isZero() ? "" : suggestOpening.toString())}" placeholder="0"></label>
-      <p class="muted small">${first ? "Your plan's opening savings are already filled in." : "Put 0 if you opened it later, then use Move money to record the money you put in."}</p>
+      <p class="muted small">${first ? "All your investments together at the plan start are your plan's opening savings." : "Put 0 if you opened it later, then use Move money to record the money you put in."}</p>
       <div class="row-2">
         <label>Usual rate <span class="muted small">(optional)</span><input name="usual_rate" inputmode="decimal" data-num="rate" value="${esc(a?.usual_rate ? Dec.of(a.usual_rate).toString() : "")}" placeholder="17"></label>
         <label>Per<select name="rate_unit">${(["yearly", "monthly", "daily"] as const).map((u) => `<option value="${u}"${(a?.rate_unit ?? "yearly") === u ? " selected" : ""}>${UNIT_LABEL[u]}</option>`).join("")}</select></label>

@@ -14,7 +14,7 @@ const CATEGORY: Record<Category, { label: string; icon: string }> = {
   unplanned: { label: "Unplanned", icon: "!" },
   gold: { label: "Gold", icon: "◆" },
   cards: { label: "Cards", icon: "▭" },
-  invest: { label: "Investments", icon: "↗" },
+  invest: { label: "Investments & savings", icon: "↗" },
   import: { label: "Imports", icon: "⇪" },
   other: { label: "Settings & goal", icon: "⚙" },
 };

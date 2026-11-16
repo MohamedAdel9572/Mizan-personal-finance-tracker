@@ -847,3 +847,6 @@ label.check input { width: auto; margin: 0; }
   .inv-row .inv-rate, .inv-row .inv-amount { grid-column: 1; grid-row: 3; }
   .inv-result { grid-column: 2; grid-row: 3; }
 }
+.from-invest { display: flex; flex-direction: column; gap: 4px; }
+.from-invest .lbl { font-weight: 600; font-size: .9rem; }
+.from-invest strong { font-size: 1.05rem; padding: 6px 0 2px; font-variant-numeric: tabular-nums; }
