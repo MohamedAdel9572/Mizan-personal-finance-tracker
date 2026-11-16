@@ -905,3 +905,7 @@ label.check input { width: auto; margin: 0; }
 .grid.tab-plan tr.flow td.num.neg::before { content: "▼"; color: var(--bad); }
 .list-card.tab-plan.sec-savings .kv.flow .num::before { content: "▲"; color: var(--good); font-size: .65em; margin-right: 4px; vertical-align: 1px; }
 .list-card.tab-plan.sec-savings .kv.flow .num.neg::before { content: "▼"; color: var(--bad); }
+/* signs and arrows sit at the left edge of each cell, so they line up down every column */
+.grid.tab-plan tr.sec-income td.num, .grid.tab-plan tr.sec-expense td.num, .grid.tab-plan tr.flow td.num { position: relative; padding-left: 26px; }
+.grid.tab-plan tr.sec-income td.num:not(.zero)::before, .grid.tab-plan tr.sec-expense td.num:not(.zero)::before,
+.grid.tab-plan tr.flow td.num:not(.zero)::before { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); margin: 0; vertical-align: 0; }
