@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { itemAmount, planEnd, PlanTimeline, projectPlan, versionFor, versionFromRow } from "../plan.ts";
 import type { PlanItem, PlanVersion } from "../types.ts";
 import { SEED_PLAN } from "../../data/seed.ts";
+import { Dec } from "../decimal.ts";
 
 function plan(partial: Partial<PlanVersion>): PlanVersion {
   return {
@@ -207,5 +208,15 @@ describe("seed plan from the Excel sheet", () => {
     expect(at("2027-12").lines.get("ps5")!.toString()).toBe("0");
     expect(at("2027-11").lines.get("ps5")!.toString()).toBe("3000");
     expect(at("2028-03").income.toString()).toBe("543750");
+  });
+});
+
+describe("known interest", () => {
+  it("replaces the rate in the months it covers", () => {
+    const v = plan({ knownInterest: { "2026-01": "100", "2026-02": "-40" } });
+    const rows = projectPlan(v);
+    expect(rows[0]!.interest.toString()).toBe("100");
+    expect(rows[1]!.interest.toString()).toBe("-40");
+    expect(rows[0]!.balance.toString()).toBe(Dec.of(v.openingBalance).plus(rows[0]!.net).plus(100).toString());
   });
 });

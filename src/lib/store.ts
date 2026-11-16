@@ -135,7 +135,9 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
   };
   // With investments, the plan's opening savings = their total at the plan start (it's the same money)
   const investOpening = invest.accounts.length ? Dec.sum(invest.accounts.map((a) => Dec.of(a.opening))).toString() : null;
-  const withSavings = (v: PlanVersion): PlanVersion => (investOpening === null ? v : { ...v, openingBalance: investOpening });
+  // ... and the plan doesn't estimate interest: real profit / loss is logged on Investments & savings
+  const withSavings = (v: PlanVersion): PlanVersion => (investOpening === null ? v
+    : { ...v, openingBalance: investOpening, rates: [{ from: v.start, annualRatePct: "0" }], knownInterest: interestByMonth(invest) });
   const versions: VersionInfo[] = versionRows.map((r) => {
     const raw = versionFromRow(r);
     return { id: r.id, version: withSavings(withGold(raw)), rawVersion: raw, note: r.note, createdAt: r.created_at };

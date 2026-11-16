@@ -196,6 +196,11 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
     : [];
   const now = currentMonth();
   const groups = gridRows(v, ctx, olderShown);
+  // no planned interest (savings live on Investments & savings): the Plan tab doesn't need an empty Interest row;
+  // with investments it shows each month's real profit / loss
+  for (const g of groups) {
+    g.rows = g.rows.filter((row) => row.label !== "Interest" || tab !== "plan" || rows.some((r) => !r.interest.isZero()));
+  }
   const logged = new Map(ctx.data.comparisons.filter((c) => !c.assumed).map((c) => [c.month, c]));
   const target = logTarget(ctx);
   const canLog = (m: Month) => !!ctx.data.timeline && m >= ctx.data.timeline.start && m <= now;
@@ -223,7 +228,7 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
         <div class="plan-meta">
           <span class="meta-chip"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>${esc(monthLabel(v.start, true))} – ${esc(monthLabel(planEnd(v), true))}<span class="muted">· ${v.horizonMonths} months</span></span>
           <span class="meta-chip"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="7.5" width="16" height="11.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="13.25" r="1.3" fill="currentColor"/></svg><span class="muted">Opening</span> ${money(v.openingBalance)} EGP</span>
-          ${rateNow ? `<span class="meta-chip"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="7.5" cy="7.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16.5" cy="16.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span class="muted">Interest</span> ${esc(Dec.of(rateNow.annualRatePct).toString())}% a year</span>` : ""}
+          ${rateNow && !Dec.of(rateNow.annualRatePct).isZero() ? `<span class="meta-chip"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="7.5" cy="7.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16.5" cy="16.5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span class="muted">Interest</span> ${esc(Dec.of(rateNow.annualRatePct).toString())}% a year</span>` : ""}
         </div>
       </div>
       <div class="head-actions plan-actions">
@@ -531,6 +536,8 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
   // with investments, opening savings come from the Investments & savings page
   const inv = ctx.data.invest.accounts;
   if (inv.length) d.openingBalance = Dec.sum(inv.map((a) => Dec.of(a.opening))).toString();
+  // no interest rate in the plan any more: real profit / loss comes from Investments & savings
+  d.rates = [{ from: d.start, rate: "0" }];
 
   const amountRow = (item: DraftItem, i: number, a: { month: string; amount: string }, j: number) => {
     const fixedFirst = item.recurrence === "recurring" && j === 0;
@@ -595,9 +602,7 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
     </section>`;
   };
 
-  const firstRate = d.rates[0]?.rate.trim() || "0";
-  const rateText = d.rates.length > 1 ? `interest ${esc(firstRate)}% (changes ${d.rates.length - 1}×)` : `interest ${esc(firstRate)}%`;
-  const settingsSummary = `Starts ${isMonth(d.start) ? monthLabel(d.start, true) : "?"} · ${esc(d.horizonMonths)} months · opening ${shownAmount(d.openingBalance || "0")} · ${rateText}`;
+  const settingsSummary = `Starts ${isMonth(d.start) ? monthLabel(d.start, true) : "?"} · ${esc(d.horizonMonths)} months · opening savings ${shownAmount(d.openingBalance || "0")}`;
 
   root.innerHTML = `
     <form id="plan-editor" novalidate>
@@ -623,16 +628,6 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
               : `<label>Opening savings (EGP) <span class="muted small">(optional)</span><input inputmode="decimal" data-f="openingBalance" value="${esc(d.openingBalance)}" placeholder="0"></label>`}
           </div>
           ${end ? `<p class="muted small">Plan runs to ${esc(monthLabel(end, true))}.</p>` : ""}
-          <div class="amounts">
-            ${d.rates.map((r, k) => `
-              <div class="amount-row">
-                ${k === 0 ? `<span class="amt-from">${d.rates.length > 1 ? "Interest at start" : "Annual interest"} <span class="muted small">(optional)</span></span>` : `<label><span class="sr-only">From month</span><input type="month" data-rate="${k}" data-f="from" value="${esc(r.from)}"></label>`}
-                <label class="suffix"><span class="sr-only">Rate</span><input inputmode="decimal" data-num="pct" maxlength="6" data-rate="${k}" data-f="rate" value="${esc(r.rate)}" placeholder="0"><span>%</span></label>
-                ${k === 0 ? "<span></span>" : `<button type="button" class="icon-btn danger" data-del-rate="${k}" aria-label="Remove rate">×</button>`}
-              </div>`).join("")}
-            <button type="button" class="btn ghost small" data-add-rate>+ Rate changes from…</button>
-          </div>
-          <p class="muted small">Interest is only the plan's estimate. Months you log on the <a href="#/invest">Investments &amp; savings</a> page use your real profit / loss instead, so you can leave it empty.</p>
           <div class="item-done"><button type="button" class="btn ghost small" data-close-settings>Done</button></div>
         </fieldset>` : `
         <div class="item-row settings-row">

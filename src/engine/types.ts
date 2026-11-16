@@ -38,6 +38,8 @@ export interface PlanVersion {
   horizonMonths: number;
   openingBalance: Money;
   rates: RatePoint[];
+  /** month -> interest already known (real profit/loss of your investments); replaces the rate for that month */
+  knownInterest?: Record<Month, Money>;
   items: PlanItem[];
 }
 

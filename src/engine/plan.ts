@@ -79,7 +79,8 @@ export function projectPlan(version: PlanVersion, until: Month = planEnd(version
     }
     const net = income.minus(expenses);
     const annualRatePct = rateAt(version, month);
-    const interest = i === 0 ? Dec.ZERO : monthlyInterest(balance, annualRatePct);
+    const known = version.knownInterest?.[month];
+    const interest = known != null ? Dec.of(known) : i === 0 ? Dec.ZERO : monthlyInterest(balance, annualRatePct);
     balance = balance.plus(interest).plus(net);
     out.push({
       month,
