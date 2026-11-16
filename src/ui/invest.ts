@@ -5,8 +5,8 @@ import { addMonths, currentMonth, isMonth, type Month } from "../engine/month.ts
 import { ApiError } from "../lib/api.ts";
 import { busy, emptyState, esc, formError, formValues, openDialog, toast } from "../lib/dom.ts";
 import { money, monthLabel, signed } from "../lib/format.ts";
-import { ledger, profitFromRate, type InvestAccount, type LedgerRow, type RateUnit } from "../lib/invest.ts";
-import { compact, lineChart } from "./charts.ts";
+import { investStats, ledger, profitFromRate, type InvestAccount, type InvestStats, type LedgerRow, type RateUnit } from "../lib/invest.ts";
+import { barChart, compact, lineChart } from "./charts.ts";
 import type { Ctx } from "./context.ts";
 
 const AMOUNT_RE = /^\d{1,14}(\.\d{1,2})?$/;
@@ -46,6 +46,7 @@ export function renderInvest(root: HTMLElement, ctx: Ctx): void {
   const total = Dec.sum(data.accounts.map((a) => endOf(a.id)));
   const allProfit = Dec.sum(data.months.map((m) => Dec.of(m.profit)));
   const openSum = Dec.sum(data.accounts.map((a) => Dec.of(a.opening)));
+  const stats = investStats(data, led);
   const logMonth = isMonth(ctx.params[0] ?? "") && ctx.params[0]! >= t.start && ctx.params[0]! <= upto ? ctx.params[0]! : upto;
 
 
@@ -56,6 +57,7 @@ export function renderInvest(root: HTMLElement, ctx: Ctx): void {
     </div>
     <div class="inv-grid">${data.accounts.map((a) => accountTile(a, led.get(a.id) ?? [])).join("")}</div>
     ${logCard(ctx, logMonth, led, upto)}
+    ${statsCard(stats)}
     ${(led.get(data.accounts[0]!.id)?.length ?? 0) >= 2 ? `<div class="card chart-card"><h2>Total over time</h2><div class="chart" id="inv-chart"></div></div>` : ""}
     ${historyCard(ctx)}`;
 
@@ -74,6 +76,22 @@ export function renderInvest(root: HTMLElement, ctx: Ctx): void {
     root.querySelector("#inv-log")?.scrollIntoView({ block: "start" });
   }));
   wireLog(root, ctx, logMonth, led);
+
+  const barsEl = root.querySelector<HTMLElement>("#inv-bars");
+  if (barsEl && stats.months.length) {
+    const ms = stats.months.map((m) => m.month);
+    const colors = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--chart-goal)", "var(--chart-planned)"];
+    const withProfit = data.accounts.filter((a) => data.months.some((x) => x.account_id === a.id));
+    barChart(barsEl, {
+      labels: ms.map((m) => monthLabel(m)),
+      height: 220,
+      format: (v) => compact(v),
+      series: withProfit.slice(0, 5).map((a, i) => ({
+        name: a.name, color: colors[i]!,
+        values: ms.map((m) => Number(data.months.find((x) => x.account_id === a.id && x.month === m)?.profit ?? 0)),
+      })),
+    });
+  }
 
   const chartEl = root.querySelector<HTMLElement>("#inv-chart");
   if (chartEl) {
@@ -341,4 +359,39 @@ function editMove(ctx: Ctx, id: number | null, reload: () => void): void {
       } catch (ex) { fail(ctx, dialog, form, ex, "Could not delete."); }
     });
   });
+}
+
+const pctText = (r: number | null, digits = 2) => (r === null ? "–" : `${r >= 0 ? "+" : ""}${(r * 100).toFixed(digits)}%`);
+const tone = (n: number | Dec | null) => (n === null ? "" : (typeof n === "number" ? n < 0 : n.isNegative()) ? "neg" : (typeof n === "number" ? n > 0 : n.gt(0)) ? "pos" : "");
+
+function statsCard(s: InvestStats): string {
+  if (!s.months.length) return `<section class="card inv-stats"><h2>Statistics</h2><p class="muted small">Log a month's profit or loss above and your statistics show here.</p></section>`;
+  const tile = (label: string, value: string, sub: string, cls = "") =>
+    `<div class="stat"><span class="stat-label">${label}</span><span class="stat-value num ${cls}">${value}</span><span class="small muted">${sub}</span></div>`;
+  const n = s.months.length;
+  return `<section class="card inv-stats">
+    <h2>Statistics</h2>
+    <p class="muted small">From ${n} logged month${n === 1 ? "" : "s"}. Returns are profit ÷ the balance at the start of the month.</p>
+    <div class="inv-stat-grid">
+      ${tile("Total profit / loss", signed(s.total), `since ${esc(monthLabel(s.months[0]!.month, true))}`, tone(s.total))}
+      ${tile("Average a month", s.avgProfit ? signed(s.avgProfit) : "–", "profit / loss", tone(s.avgProfit))}
+      ${tile("Best month", s.best ? signed(s.best.profit) : "–", s.best ? esc(monthLabel(s.best.month, true)) : "", tone(s.best?.profit ?? null))}
+      ${tile("Worst month", s.worst ? signed(s.worst.profit) : "–", s.worst ? esc(monthLabel(s.worst.month, true)) : "needs 2 months", tone(s.worst?.profit ?? null))}
+      ${tile("Average monthly return", pctText(s.avgMonthlyRet), "on what was invested", tone(s.avgMonthlyRet))}
+      ${tile("Yearly return at this pace", pctText(s.yearlyRet, 1), "the monthly average over 12 months", tone(s.yearlyRet))}
+    </div>
+    <h3>Profit / loss by month</h3>
+    <div class="chart" id="inv-bars"></div>
+    <h3>By investment</h3>
+    <div class="table-wrap"><table class="inv-table">
+      <thead><tr><th scope="col">Investment</th><th scope="col" class="num">Now</th><th scope="col">Share</th><th scope="col" class="num">Profit / loss</th><th scope="col" class="num">Avg monthly return</th></tr></thead>
+      <tbody>${s.accounts.map((a) => `<tr>
+        <th scope="row">${esc(a.name)}</th>
+        <td class="num">${money(a.now)}</td>
+        <td><span class="share"><span class="share-bar" aria-hidden="true"><i style="width:${(a.share * 100).toFixed(1)}%"></i></span><span class="small">${(a.share * 100).toFixed(0)}%</span></span></td>
+        <td class="num ${tone(a.profit)}">${a.logged ? signed(a.profit) : "–"}</td>
+        <td class="num ${tone(a.avgMonthlyRet)}">${pctText(a.avgMonthlyRet)}</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+  </section>`;
 }

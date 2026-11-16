@@ -98,3 +98,62 @@ export function ledger(data: InvestData, start: Month, upto: Month, netOf: (m: M
   }
   return out;
 }
+
+export interface MonthStat { month: Month; profit: Dec; start: Dec; /** profit / balance at the start of the month, 0..1 (null when nothing was invested) */ ret: number | null }
+export interface AccountStat { id: number; name: string; now: Dec; share: number; profit: Dec; avgMonthlyRet: number | null; logged: number }
+export interface InvestStats {
+  months: MonthStat[]; // logged months, oldest first
+  total: Dec;
+  avgProfit: Dec | null;
+  best: MonthStat | null;
+  worst: MonthStat | null;
+  avgMonthlyRet: number | null;
+  /** the average monthly return compounded over 12 months */
+  yearlyRet: number | null;
+  accounts: AccountStat[];
+}
+
+const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+
+/** Statistics from the logged profit/loss and the ledger (balances at the start of each month). */
+export function investStats(data: InvestData, led: Map<number, LedgerRow[]>): InvestStats {
+  const loggedMonths = [...new Set(data.months.map((m) => m.month))].sort();
+  const rowAt = (id: number, m: Month) => led.get(id)?.find((r) => r.month === m);
+  const months: MonthStat[] = loggedMonths.map((m) => {
+    const ps = data.months.filter((x) => x.month === m);
+    const profit = Dec.sum(ps.map((x) => Dec.of(x.profit)));
+    // return on the money that earned it: only investments with something logged that month
+    const start = Dec.sum(ps.map((x) => rowAt(x.account_id, m)?.start ?? Dec.ZERO));
+    return { month: m, profit, start, ret: start.gt(0) ? profit.div(start).toNumber() : null };
+  });
+  const rets = months.map((m) => m.ret).filter((r): r is number => r !== null);
+  const avgMonthlyRet = mean(rets);
+  const nowOf = (id: number) => led.get(id)?.at(-1)?.end ?? Dec.ZERO;
+  const totalNow = Dec.sum(data.accounts.map((a) => nowOf(a.id)));
+  const accounts: AccountStat[] = data.accounts.map((a) => {
+    const mine = data.months.filter((x) => x.account_id === a.id);
+    const r = mine.map((x) => {
+      const s = rowAt(a.id, x.month)?.start ?? Dec.ZERO;
+      return s.gt(0) ? Dec.of(x.profit).div(s).toNumber() : null;
+    }).filter((v): v is number => v !== null);
+    const now = nowOf(a.id);
+    return {
+      id: a.id, name: a.name, now,
+      share: totalNow.gt(0) && now.gt(0) ? now.div(totalNow).toNumber() : 0,
+      profit: Dec.sum(mine.map((x) => Dec.of(x.profit))),
+      avgMonthlyRet: mean(r),
+      logged: mine.length,
+    };
+  });
+  const sorted = [...months].sort((x, y) => x.profit.cmp(y.profit));
+  return {
+    months,
+    total: Dec.sum(months.map((m) => m.profit)),
+    avgProfit: months.length ? Dec.sum(months.map((m) => m.profit)).div(months.length) : null,
+    best: sorted.at(-1) ?? null,
+    worst: months.length > 1 ? sorted[0]! : null,
+    avgMonthlyRet,
+    yearlyRet: avgMonthlyRet === null ? null : Math.pow(1 + avgMonthlyRet, 12) - 1,
+    accounts,
+  };
+}

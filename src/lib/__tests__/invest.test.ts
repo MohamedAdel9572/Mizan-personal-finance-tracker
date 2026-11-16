@@ -35,3 +35,22 @@ describe("investments", () => {
     expect(m[1]!.end.plus(t[1]!.end).toString()).toBe(Dec.of(100000).plus(10000).plus(1416.67).plus(400).toString());
   });
 });
+
+import { investStats } from "../invest.ts";
+describe("investment statistics", () => {
+  it("totals, best/worst month, returns and shares", () => {
+    const l = ledger(data, "2026-11", "2026-12", () => Dec.of(5000));
+    const s = investStats(data, l);
+    expect(s.total.toString()).toBe("1816.67");
+    expect(s.best!.month).toBe("2026-11");
+    expect(s.worst!.month).toBe("2026-12");
+    expect(Math.abs((s.months[0]!.ret!) - (0.0141667)) < 1e-5).toBe(true); // 1416.67 / 100000
+    // Dec: Mashreq 1200 + Thndr -800 on a start of 106416.67 (Thndr started at 0)
+    expect(Math.abs((s.months[1]!.ret!) - (400 / 106416.67)) < 1e-6).toBe(true);
+    expect(s.yearlyRet! > 0).toBe(true);
+    const th = s.accounts.find((a) => a.name === "Thndr")!;
+    expect(th.profit.toString()).toBe("-800");
+    expect(th.avgMonthlyRet).toBeNull(); // nothing invested at the start of Dec
+    expect(Math.abs((s.accounts.reduce((t, a) => t + a.share, 0)) - (1)) < 1e-6).toBe(true);
+  });
+});

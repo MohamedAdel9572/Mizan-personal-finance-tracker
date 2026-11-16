@@ -850,3 +850,18 @@ label.check input { width: auto; margin: 0; }
 .from-invest { display: flex; flex-direction: column; gap: 4px; }
 .from-invest .lbl { font-weight: 600; font-size: .9rem; }
 .from-invest strong { font-size: 1.05rem; padding: 6px 0 2px; font-variant-numeric: tabular-nums; }
+.inv-stats { margin-bottom: 16px; }
+.inv-stats h2 { margin: 0 0 4px; }
+.inv-stats h3 { margin: 18px 0 8px; font-size: .95rem; }
+.inv-stat-grid { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 10px; }
+.inv-stat-grid .stat { background: var(--surface-2); border-radius: 10px; padding: 12px; min-width: 0; }
+.inv-stat-grid .stat-value { font-size: 1.15rem; }
+.table-wrap { overflow-x: auto; }
+.inv-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.inv-table th, .inv-table td { padding: 9px 8px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+.inv-table thead th { color: var(--muted); font-size: .78rem; font-weight: 600; }
+.inv-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.share { display: inline-flex; align-items: center; gap: 8px; min-width: 120px; }
+.share-bar { display: block; width: 80px; height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.share-bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+@media (max-width: 520px) { .inv-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .share-bar { width: 44px; } .share { min-width: 0; } }
