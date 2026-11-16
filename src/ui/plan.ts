@@ -48,6 +48,14 @@ interface GridRow {
   tag?: { text: string; title: string };
 }
 
+/** what a section does to your money: income adds (+), expenses take away (−), savings is the result (=) */
+function secOf(section: string): { cls: string; sign: string } {
+  if (section === "Income") return { cls: "sec-income", sign: "+" };
+  if (section.startsWith("Installments")) return { cls: "sec-expense", sign: "−" };
+  if (section === "Savings") return { cls: "sec-savings", sign: "=" };
+  return { cls: "sec-assets", sign: "" };
+}
+
 function gridRows(v: PlanVersion, ctx: Ctx, older: readonly PlanVersion[] = []): { section: string; rows: GridRow[] }[] {
   const cmp = new Map(ctx.data.comparisons.filter((c) => !c.assumed).map((c) => [c.month, c]));
   const act = new Map(ctx.data.actuals.filter((a) => !a.assumed).map((a) => [a.month, a]));
@@ -279,19 +287,19 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
           <thead><tr><th>Line</th></tr></thead>
           <tbody>
             ${groups.map((g) => `
-              <tr class="section"><th>${esc(g.section)}</th></tr>
-              ${g.rows.map((row) => `<tr class="${row.cls}"><th>${esc(row.label)}${row.tag ? ` <span class="row-tag" title="${esc(row.tag.title)}">${esc(row.tag.text)}</span>` : ""}</th></tr>`).join("")}
+              <tr class="section ${secOf(g.section).cls}"><th>${secOf(g.section).sign ? `<span class="sec-sign" aria-hidden="true">${secOf(g.section).sign}</span>` : ""}${esc(g.section)}</th></tr>
+              ${g.rows.map((row) => `<tr class="${row.cls} ${secOf(g.section).cls}"><th>${esc(row.label)}${row.tag ? ` <span class="row-tag" title="${esc(row.tag.title)}">${esc(row.tag.text)}</span>` : ""}</th></tr>`).join("")}
             `).join("")}
           </tbody>
         </table>
       </div>
       <div class="grid-wrap" role="region" aria-label="${tab === "plan" ? "Plan by month" : "Actual by month"}" tabindex="0">
-        <table class="grid values">
+        <table class="grid values tab-${tab}">
           <thead><tr><th class="sr-only" scope="col">Line</th>${rows.map((r) => monthHead(r.month)).join("")}</tr></thead>
           <tbody>
             ${groups.map((g) => `
-              <tr class="section"><th class="sr-only" scope="rowgroup">${esc(g.section)}</th><td colspan="${rows.length}"></td></tr>
-              ${g.rows.map((row) => `<tr class="${row.cls}"><th class="sr-only" scope="row">${esc(row.label)}</th>${rows.map((r) =>
+              <tr class="section ${secOf(g.section).cls}"><th class="sr-only" scope="rowgroup">${esc(g.section)}</th><td colspan="${rows.length}"></td></tr>
+              ${g.rows.map((row) => `<tr class="${row.cls} ${secOf(g.section).cls}"><th class="sr-only" scope="row">${esc(row.label)}</th>${rows.map((r) =>
                 tab === "plan" ? cell(row.values(r), row.cls.includes("signed") || row.cls === "grand", r.month, null)
                   : actualCell(row, r.month, row.cls.includes("signed") || row.cls === "grand", logged.has(r.month))).join("")}</tr>`).join("")}
             `).join("")}
@@ -308,8 +316,8 @@ export function renderPlan(root: HTMLElement, ctx: Ctx): void {
       </div>
       ${canLog(mm.month) ? `<a class="btn ${logged.has(mm.month) ? "ghost" : "primary"} block" href="${LOG_BASE}${mm.month}">${logged.has(mm.month) ? "Edit" : "Log"} ${esc(monthLabel(mm.month, true))}</a>` : ""}
       ${tab === "actual" && !logged.has(mm.month) ? `<p class="muted center">Not logged yet.</p>` : `<div class="swipe">${groups.map((g) => `
-        <div class="card list-card">
-          <h3>${esc(g.section)}</h3>
+        <div class="card list-card ${secOf(g.section).cls} tab-${tab}">
+          <h3>${secOf(g.section).sign ? `<span class="sec-sign" aria-hidden="true">${secOf(g.section).sign}</span>` : ""}${esc(g.section)}</h3>
           ${g.rows.map((row) => {
             const a = row.actual ? row.actual(mm.month) : null;
             const d = tab === "plan" ? row.values(mm) : a ? a.actual : row.logged?.(mm.month) ?? null;

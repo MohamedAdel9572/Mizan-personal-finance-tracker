@@ -865,3 +865,36 @@ label.check input { width: auto; margin: 0; }
 .share-bar { display: block; width: 80px; height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
 .share-bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
 @media (max-width: 520px) { .inv-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .share-bar { width: 44px; } .share { min-width: 0; } }
+/* ---------- plan grid: income adds (+), expenses take away (−), savings is the result (=) ---------- */
+.sec-sign { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 6px; margin-right: 8px;
+  font-size: .85rem; font-weight: 800; line-height: 1; letter-spacing: 0; vertical-align: -3px; }
+.sec-income .sec-sign { background: var(--good-soft); color: var(--good); }
+.sec-expense .sec-sign { background: var(--bad-soft); color: var(--bad); }
+.sec-savings .sec-sign { background: var(--accent-soft); color: var(--accent); }
+.grid tr.section.sec-income th { color: var(--good); }
+.grid tr.section.sec-expense th { color: var(--bad); }
+.grid tr.section.sec-savings th { color: var(--accent); }
+/* a coloured edge on each line's name */
+.grid-names tr.sec-income:not(.section) th { box-shadow: inset 3px 0 0 var(--good); }
+.grid-names tr.sec-expense:not(.section) th { box-shadow: inset 3px 0 0 var(--bad); }
+.grid-names tr.sec-savings:not(.section) th { box-shadow: inset 3px 0 0 var(--accent); }
+.grid-names tr.sec-assets:not(.section):not(.grand) th { box-shadow: inset 3px 0 0 var(--warn); }
+/* values on the Plan tab: + for income, − for expenses, coloured softly */
+.grid.tab-plan tr.sec-income td.num:not(.zero) { color: color-mix(in srgb, var(--good) 75%, var(--text)); }
+.grid.tab-plan tr.sec-expense td.num:not(.zero) { color: color-mix(in srgb, var(--bad) 70%, var(--text)); }
+.grid.tab-plan tr.sec-income td.num:not(.zero)::before { content: "+"; opacity: .75; margin-right: 1px; }
+.grid.tab-plan tr.sec-expense td.num:not(.zero)::before { content: "−"; opacity: .75; margin-right: 1px; }
+/* totals stand out with a tint */
+.grid tr.total.sec-income th, .grid tr.total.sec-income td { background: color-mix(in srgb, var(--good) 10%, var(--surface)); }
+.grid tr.total.sec-expense th, .grid tr.total.sec-expense td { background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
+.grid tr.sec-savings:not(.section) th, .grid tr.sec-savings:not(.section) td { background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+/* every other line slightly shaded, so the eye can follow a row across */
+.grid tr.line:nth-child(even) th, .grid tr.line:nth-child(even) td { background: color-mix(in srgb, var(--text) 3%, var(--surface)); }
+/* phone month view */
+.list-card.sec-income h3 { color: var(--good); }
+.list-card.sec-expense h3 { color: var(--bad); }
+.list-card.sec-savings h3 { color: var(--accent); }
+.list-card.tab-plan.sec-income .kv .num:not(:empty) { color: color-mix(in srgb, var(--good) 75%, var(--text)); }
+.list-card.tab-plan.sec-expense .kv .num:not(:empty) { color: color-mix(in srgb, var(--bad) 70%, var(--text)); }
+.list-card.tab-plan.sec-income .kv .num::before { content: "+"; opacity: .75; }
+.list-card.tab-plan.sec-expense .kv .num::before { content: "−"; opacity: .75; }
