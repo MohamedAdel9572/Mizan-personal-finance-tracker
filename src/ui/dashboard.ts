@@ -59,8 +59,10 @@ export function renderDashboard(root: HTMLElement, ctx: Ctx): void {
   const plannedRate = lastActual ? rateOf(planned(lastActual.month)!.net, planned(lastActual.month)!.income) : null;
   const gold = ctx.data.goldValue;
 
+  // the currency is shown smaller so big numbers fit their tile
+  const unit = (v: string) => v.replace(/ EGP$/, ' <span class="unit">EGP</span>');
   const tile = (label: string, value: string, sub: string, cls = "") =>
-    `<div class="card stat"><span class="stat-label">${label}</span><span class="stat-value num ${cls}">${value}</span><span class="small muted">${sub}</span></div>`;
+    `<div class="card stat"><span class="stat-label">${label}</span><span class="stat-value num ${cls}">${unit(value)}</span><span class="small muted">${sub}</span></div>`;
   const toneOf = (d: Dec) => (d.round(0).isZero() ? "" : d.isNegative() ? "neg" : "pos");
 
   root.innerHTML = `
@@ -72,14 +74,14 @@ export function renderDashboard(root: HTMLElement, ctx: Ctx): void {
       </div>
     </div>
 
-    <div class="kpis">
+    <div class="kpis-wrap"><div class="kpis">
       ${tile("Net worth", egp(nwNow), lastActual ? `plan ${money(nwPlannedNow)} · ${signed(nwNow.minus(nwPlannedNow))}` : `planned for ${monthLabel(now < t.start ? t.start : now, true)}`, lastActual ? toneOf(nwNow.minus(nwPlannedNow)) : "")}
       ${goal ? tile("Goal progress", pct(goalProgress(nwNow, goal)), `of ${money(goal.targetAmount)} by ${monthLabel(goal.targetMonth, true)}`) : tile("Goal", "Not set", "set a goal to track progress")}
       ${lastCmp ? tile("Last month vs plan", signed(lastCmp.net.gap), `${monthLabel(lastCmp.month, true)} net ${money(lastCmp.net.actual)}`, toneOf(lastCmp.net.gap)) : tile("Last month vs plan", "–", "log a month to compare")}
       ${lastCmp ? tile("Total gap so far", signed(lastCmp.cumulative.net), `since ${monthLabel(t.start, true)}`, toneOf(lastCmp.cumulative.net)) : ""}
       ${lastRate !== null ? tile("Savings rate", pct(lastRate), `plan ${plannedRate !== null ? pct(plannedRate) : "–"} · ${monthLabel(lastActual!.month, true)}`, lastRate.gte(plannedRate ?? Dec.ZERO) ? "pos" : "neg") : ""}
-      ${gold ? `<a class="card stat link-card" href="#/gold"><span class="stat-label">Gold now</span><span class="stat-value num">${egp(gold)}</span><span class="small muted">${ctx.data.goldFeed && !ctx.data.goldFeed.stale ? "at today's price" : "at the last known price"}</span></a>` : ""}
-    </div>
+      ${gold ? `<a class="card stat link-card" href="#/gold"><span class="stat-label">Gold now</span><span class="stat-value num">${unit(egp(gold))}</span><span class="small muted">${ctx.data.goldFeed && !ctx.data.goldFeed.stale ? "at today's price" : "at the last known price"}</span></a>` : ""}
+    </div></div>
 
     <div class="dash-grid">
       ${goal ? goalCard(goal, nwNow, nwPlannedNow, planFinish, proj) : `<section class="card"><h2>Your goal</h2><p class="muted">Set a target (for example 1,000,000 EGP by Dec 2028) to see your progress and when you'll reach it.</p><button class="btn primary" id="set-goal-2">Set goal</button></section>`}
@@ -100,6 +102,7 @@ export function renderDashboard(root: HTMLElement, ctx: Ctx): void {
 
   const kpis = root.querySelector<HTMLElement>(".kpis");
   kpis?.style.setProperty("--n", String(kpis.children.length));
+  kpis?.setAttribute("data-n", String(kpis.children.length));
 
   // ---------- charts ----------
   const n = (d: Dec | undefined | null) => (d ? d.toNumber() : null);

@@ -526,14 +526,28 @@ dialog.sheet.wide { width: min(980px, 100vw); max-width: min(980px, 100vw); }
 :root { --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --chart-planned: #8a93a0; --chart-goal: #c98500; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --chart-planned: #7d8792; --chart-goal: #c98500; } }
 :root[data-theme="dark"] { --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --chart-planned: #7d8792; --chart-goal: #c98500; }
-/* tiles share the whole row however many there are (4 to 6), so no empty slots */
-.kpis { display: grid; gap: 12px; margin-bottom: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* tiles fill their rows with no empty slots, and only go on one row when each tile has room
+   (about 190px); otherwise 6 tiles = 2 rows of 3, 5 = 3 + 2, 4 = 2 rows of 2 */
+.kpis-wrap { container-type: inline-size; margin-bottom: 16px; }
+.kpis { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .kpis > .stat { min-width: 0; }
 .kpis > .stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
-@media (min-width: 900px) {
-  /* one row: as many columns as tiles (set by the dashboard as --n) */
-  .kpis { grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); }
-  .kpis > .stat:last-child:nth-child(odd) { grid-column: auto; }
+.stat-value { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-value .unit { font-size: .62em; font-weight: 600; color: var(--muted); letter-spacing: .02em; }
+@container (min-width: 600px) {
+  .kpis[data-n="6"], .kpis[data-n="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpis[data-n="5"] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .kpis[data-n="5"] > .stat { grid-column: span 2; }
+  .kpis[data-n="5"] > .stat:nth-child(n+4) { grid-column: span 3; }
+  .kpis[data-n="6"] > .stat:last-child:nth-child(odd), .kpis[data-n="3"] > .stat:last-child { grid-column: auto; }
+}
+@container (min-width: 800px) {
+  .kpis[data-n="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .kpis[data-n="4"] > .stat:last-child { grid-column: auto; }
+}
+@container (min-width: 1180px) {
+  .kpis[data-n] { grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); }
+  .kpis[data-n] > .stat, .kpis[data-n="5"] > .stat:nth-child(n+4) { grid-column: auto; }
 }
 .dash-grid, .chart-grid { display: grid; gap: 16px; margin-bottom: 16px; grid-template-columns: 1fr; }
 @media (min-width: 1000px) { .dash-grid { grid-template-columns: 3fr 2fr; } .chart-grid { grid-template-columns: 1fr 1fr; } }
