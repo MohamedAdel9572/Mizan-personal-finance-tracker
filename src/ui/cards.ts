@@ -104,7 +104,7 @@ function plastic(s: CardState, on: boolean): string {
   return `
   <button type="button" class="pcard pc-${esc(c.color)}${on ? " on" : ""}" data-card="${c.id}" role="tab" aria-selected="${on}">
     <span class="pc-top"><span class="pc-bank">${esc(c.bank || (credit ? "Credit card" : "Debit card"))}</span><span class="pc-kind">${credit ? "Credit" : "Debit"}</span></span>
-    <span class="pc-chip" aria-hidden="true"></span>
+    <span class="pcard-chip" aria-hidden="true"></span>
     <span class="pc-num"><span>••••</span><span>••••</span><span>••••</span><span>${esc(c.last4 ?? "••••")}</span></span>
     <span class="pc-bottom">
       <span class="pc-name">${esc(c.name)}</span>
