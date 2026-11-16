@@ -81,6 +81,8 @@ export interface ActualsInput {
   unplanned: UnplannedItem[];
   /** month -> value of assets at month end (gold at that month's price + other assets) */
   assetValues?: Record<Month, Money>;
+  /** month -> real interest (total profit/loss of your investments that month); replaces the rate formula */
+  interest?: Record<Month, Money>;
 }
 
 export interface ActualMonth {

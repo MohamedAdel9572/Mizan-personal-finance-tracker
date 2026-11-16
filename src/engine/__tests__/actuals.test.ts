@@ -29,6 +29,17 @@ const onPlanMonth = (month: string) => [
 ];
 
 describe("buildActuals", () => {
+  it("uses the real investment profit/loss as Interest when given", () => {
+    const a = buildActuals(timeline, {
+      checkins: [{ month: "2026-01" }, { month: "2026-02" }],
+      entries: [...onPlanMonth("2026-01"), ...onPlanMonth("2026-02")],
+      unplanned: [],
+      interest: { "2026-01": "50", "2026-02": "-30" },
+    });
+    expect(a.map((m) => m.interest.toString())).toEqual(["50", "-30"]);
+    expect(a[1]!.balance.toString()).toBe("14020"); // 10000 + 2000 + 50 + 2000 - 30
+  });
+
   it("returns nothing before the first check-in", () => {
     expect(buildActuals(timeline, { checkins: [], entries: [], unplanned: [] })).toEqual([]);
   });

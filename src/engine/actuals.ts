@@ -14,7 +14,8 @@ import type { ActualMonth, ActualsInput, UnplannedItem } from "./types.ts";
  * - A month with no check-in between the start and the last check-in is
  *   filled with the planned values and marked assumed=true, so the balance
  *   chain doesn't break. The UI greys these months out.
- * - Interest uses the rate of the plan version active that month.
+ * - Interest uses the rate of the plan version active that month, unless
+ *   input.interest has the real profit/loss of your investments for it.
  * - If the check-in has a real bank balance, it replaces the computed balance
  *   from that month on (the bank is the truth; the formula is an estimate).
  * - Asset value comes from input.assetValues (gold at that month's price),
@@ -76,7 +77,8 @@ export function buildActuals(timeline: PlanTimeline, input: ActualsInput): Actua
 
     const net = income.minus(expenses);
     const rate = planned?.annualRatePct ?? Dec.ZERO;
-    const interest = i === 0 ? Dec.ZERO : monthlyInterest(balance, rate);
+    const real = input.interest?.[month];
+    const interest = real != null ? Dec.of(real) : i === 0 ? Dec.ZERO : monthlyInterest(balance, rate);
     balance = balance.plus(interest).plus(net);
     const reported = checkin?.savingsBalance != null && checkin.savingsBalance !== "";
     if (reported) balance = Dec.of(checkin!.savingsBalance!);

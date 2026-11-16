@@ -116,6 +116,11 @@ export function renderLog(root: HTMLElement, ctx: Ctx): void {
         <h2>Planned lines <span class="muted small">(plan v${version.versionNo})</span></h2>
         ${keys.length ? group("income", "Income") + group("expense", "Installments & expenses") : `<p class="muted">No planned lines this month.</p>`}
         <h3>Savings account</h3>
+        ${ctx.data.invest.accounts.length ? (() => {
+          const ps = ctx.data.invest.months.filter((x) => x.month === month);
+          const tot = Dec.sum(ps.map((x) => Dec.of(x.profit)));
+          return `<p class="muted small">Interest this month comes from your investments: ${ps.length ? `<strong class="${tot.isNegative() ? "neg" : "pos"}">${signed(tot, 2)}</strong>` : "nothing logged yet"}. <a href="#/invest/${month}">Log profit / loss →</a></p>`;
+        })() : ""}
         <label>Real balance at month end <span class="muted small">(optional; from your bank)</span>
           <input name="balance" inputmode="decimal" value="${esc(checkin?.savingsBalance ? Dec.of(checkin.savingsBalance).toString() : "")}" placeholder="plan: ${esc(money(planned.balance))}">
         </label>

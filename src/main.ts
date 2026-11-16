@@ -7,6 +7,7 @@ import { renderLogin, renderSignup } from "./ui/auth.ts";
 import type { Ctx } from "./ui/context.ts";
 import { renderGold } from "./ui/gold.ts";
 import { renderCards } from "./ui/cards.ts";
+import { renderInvest } from "./ui/invest.ts";
 import { renderHistory } from "./ui/history.ts";
 import { discardPlanDraft, hasUnsavedPlan, renderPlan } from "./ui/plan.ts";
 import { loadingHtml, shellHtml } from "./ui/shell.ts";
@@ -28,6 +29,7 @@ const SCREENS: Record<string, (root: HTMLElement, ctx: Ctx) => void> = {
   plan: renderPlan,
   gold: renderGold,
   cards: renderCards,
+  invest: renderInvest,
   history: renderHistory,
 };
 

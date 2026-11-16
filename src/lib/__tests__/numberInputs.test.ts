@@ -24,4 +24,11 @@ describe("number boxes", () => {
   it("grams allow 3 decimals", () => {
     expect(cleanNumber("2.1255g", "grams")).toBe("2.125");
   });
+  it("signed money and rates", () => {
+    expect(cleanNumber("-800", "signed-money")).toBe("-800");
+    expect(cleanNumber("−1,250.555", "signed-money")).toBe("-1,250.55");
+    expect(cleanNumber("+abc12", "signed-money")).toBe("+12");
+    expect(cleanNumber("0.04657", "rate")).toBe("0.0465");
+    expect(cleanNumber("-17%", "rate")).toBe("17");
+  });
 });

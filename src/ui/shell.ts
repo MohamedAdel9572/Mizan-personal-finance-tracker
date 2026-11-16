@@ -4,8 +4,10 @@ export interface NavItem {
   route: string;
   label: string;
   icon: string;
-  /** shown in the mobile bottom bar (max 5) */
+  /** shown in the mobile bottom bar (6 at most; History moves to the top bar on phones) */
   mobile: boolean;
+  /** shorter label for the bottom bar */
+  short?: string;
 }
 
 // Simple inline SVG icons (stroke = currentColor) so they follow light/dark mode.
@@ -18,7 +20,8 @@ export const NAV: NavItem[] = [
   { route: "plan/log", label: "Log", mobile: true, icon: svg('<path d="M12 5v14M5 12h14"/><circle cx="12" cy="12" r="9"/>') },
   { route: "gold", label: "Gold", mobile: true, icon: svg('<path d="M3 18h18l-3-6H6z"/><path d="M8 12l2-5h4l2 5"/>') },
   { route: "cards", label: "Cards", mobile: true, icon: svg('<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19M6.5 15h4"/>') },
-  { route: "history", label: "History", mobile: true, icon: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>') },
+  { route: "invest", label: "Investments", short: "Invest", mobile: true, icon: svg('<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>') },
+  { route: "history", label: "History", mobile: false, icon: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>') },
 ];
 
 const logoutIcon = svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/>');
@@ -27,7 +30,8 @@ const settingsIcon = svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1
 
 export function shellHtml(active: string, userName: string): string {
   const link = (n: NavItem, cls: string) =>
-    `<a class="${cls}${n.route === active ? " active" : ""}" href="#/${n.route}"${n.route === active ? ' aria-current="page"' : ""}>${n.icon}<span>${esc(n.label)}</span></a>`;
+    `<a class="${cls}${n.route === active ? " active" : ""}" href="#/${n.route}"${n.route === active ? ' aria-current="page"' : ""}>${n.icon}<span>${esc(cls === "tab" ? n.short ?? n.label : n.label)}</span></a>`;
+  const historyIcon = NAV.find((n) => n.route === "history")!.icon;
   return `
   <div class="layout">
     <aside class="sidebar" aria-label="Main">
@@ -42,6 +46,7 @@ export function shellHtml(active: string, userName: string): string {
       <header class="topbar">
         <div class="brand"><span class="logo" aria-hidden="true">⚖</span> Mizan</div>
         <div class="topbar-actions">
+          <a class="icon-btn${active === "history" ? " active" : ""}" href="#/history" aria-label="History" title="History">${historyIcon}</a>
           <a class="icon-btn${active === "settings" ? " active" : ""}" href="#/settings" aria-label="Settings">${settingsIcon}</a>
           <button type="button" class="icon-btn" data-logout aria-label="Sign out" title="Sign out">${logoutIcon}</button>
         </div>

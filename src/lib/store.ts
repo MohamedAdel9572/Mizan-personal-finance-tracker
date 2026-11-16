@@ -13,6 +13,7 @@ import { valueHoldings } from "../engine/gold.ts";
 import { effectivePrices, toHoldings, type HoldingRow, type PriceRow } from "./gold.ts";
 import { adjustFeed, getGoldFeed, type GoldFeed } from "./goldFeed.ts";
 import type { CardsData } from "./cards.ts";
+import { EMPTY_INVEST, interestByMonth, type InvestData } from "./invest.ts";
 
 /** The plan line that means "my gold" (English or Arabic name). */
 export function isGoldLine(name: string): boolean {
@@ -75,6 +76,8 @@ export interface AppData {
   settings: Settings;
   /** cards, their entries and which plan lines they pay (empty before migration 016/017) */
   cards: CardsData;
+  /** investments where your savings sit; their monthly profit/loss is the actual Interest */
+  invest: InvestData;
 }
 
 export interface Settings {
@@ -90,7 +93,7 @@ export async function loadProfile(api: Api): Promise<Profile | null> {
 }
 
 export async function loadData(api: Api, profile: Profile): Promise<AppData> {
-  const [versionRows, actualRows, goldRows, priceRows, goalRow, settingsRow, cardsRow] = await Promise.all([
+  const [versionRows, actualRows, goldRows, priceRows, goalRow, settingsRow, cardsRow, investRow] = await Promise.all([
     api.rpc<(PlanVersionRow & { id: number; note: string; created_at: string })[]>("get_plan_versions"),
     api.rpc<ActualsRow>("get_actuals"),
     api.rpc<HoldingRow[]>("get_gold_holdings").catch(() => [] as HoldingRow[]),
@@ -98,7 +101,9 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
     api.rpc<{ target_amount: string; target_month: string; monthly_savings_target: string | null } | null>("get_goal").catch(() => null),
     api.rpc<{ warn_threshold_pct: string; gold_adjust_pct: string } | null>("get_settings").catch(() => null),
     api.rpc<CardsData | null>("get_cards").catch(() => null),
+    api.rpc<InvestData | null>("get_investments").catch(() => null),
   ]);
+  const invest: InvestData = investRow ? { accounts: investRow.accounts ?? [], months: investRow.months ?? [], moves: investRow.moves ?? [] } : EMPTY_INVEST;
   const cards: CardsData = { cards: cardsRow?.cards ?? [], txns: cardsRow?.txns ?? [], links: cardsRow?.links ?? [] };
   const settings: Settings = { warnPct: settingsRow?.warn_threshold_pct ?? "5", goldAdjustPct: settingsRow?.gold_adjust_pct ?? "0" };
   const owned = goldRows.filter((g) => !g.sold_date);
@@ -161,6 +166,7 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
 
   const input: ActualsInput = {
     assetValues,
+    interest: interestByMonth(invest),
     checkins: actualRows.checkins.map((c) => ({ month: c.month, savingsBalance: c.savings_balance })),
     entries: actualRows.entries.map((e) => ({ month: e.month, itemKey: e.item_key, amount: e.amount })),
     unplanned: actualRows.unplanned.map((u) => ({ month: u.month, kind: u.kind, name: u.name, amount: u.amount })),
@@ -184,6 +190,7 @@ export async function loadData(api: Api, profile: Profile): Promise<AppData> {
     goldValueAt,
     settings,
     cards,
+    invest,
     goal: goalRow ? { targetAmount: goalRow.target_amount, targetMonth: goalRow.target_month, monthlySavingsTarget: goalRow.monthly_savings_target } : null,
   };
 }
