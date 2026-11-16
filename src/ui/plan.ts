@@ -50,8 +50,8 @@ interface GridRow {
 
 /** what a section does to your money: income adds (+), expenses take away (−), savings is the result (=) */
 function secOf(section: string): { cls: string; sign: string } {
-  if (section === "Income") return { cls: "sec-income", sign: "+" };
-  if (section.startsWith("Installments")) return { cls: "sec-expense", sign: "−" };
+  if (section === "Income") return { cls: "sec-income", sign: "↑" };
+  if (section.startsWith("Installments")) return { cls: "sec-expense", sign: "↓" };
   if (section === "Savings") return { cls: "sec-savings", sign: "=" };
   return { cls: "sec-assets", sign: "" };
 }
@@ -102,9 +102,9 @@ function gridRows(v: PlanVersion, ctx: Ctx, older: readonly PlanVersion[] = []):
     {
       section: "Savings",
       rows: [
-        { label: "Net", cls: "total signed", values: (r) => r.net, actual: total((c) => c.net, true, "neutral") },
+        { label: "Net", cls: "total signed flow", values: (r) => r.net, actual: total((c) => c.net, true, "neutral") },
         {
-          label: "Interest", cls: "line", values: (r) => r.interest,
+          label: "Interest", cls: "line signed flow", values: (r) => r.interest,
           actual: (m) => {
             const a = act.get(m);
             const p = ctx.data.timeline?.planned(m);

@@ -900,3 +900,8 @@ label.check input { width: auto; margin: 0; }
 .list-card.tab-plan.sec-expense .kv .num::before { content: "−"; color: var(--bad); font-weight: 700; margin-right: 2px; }
 .list-card.tab-plan.sec-income .kv.total .num { color: var(--good); }
 .list-card.tab-plan.sec-expense .kv.total .num { color: var(--bad); }
+/* Net and Interest: ▲ when money grew that month, ▼ when it shrank */
+.grid.tab-plan tr.flow td.num:not(.zero)::before { content: "▲"; color: var(--good); font-size: .65em; margin-right: 4px; vertical-align: 1px; }
+.grid.tab-plan tr.flow td.num.neg::before { content: "▼"; color: var(--bad); }
+.list-card.tab-plan.sec-savings .kv.flow .num::before { content: "▲"; color: var(--good); font-size: .65em; margin-right: 4px; vertical-align: 1px; }
+.list-card.tab-plan.sec-savings .kv.flow .num.neg::before { content: "▼"; color: var(--bad); }
