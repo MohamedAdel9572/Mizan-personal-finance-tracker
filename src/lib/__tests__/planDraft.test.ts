@@ -74,3 +74,14 @@ describe("helpers", () => {
     expect(monthLabel("2026-11", true)).toBe("Nov 2026");
   });
 });
+
+describe("optional opening savings and interest", () => {
+  it("empty means 0", () => {
+    const d: Draft = { ...draftFromVersion({ ...SEED_PLAN }), openingBalance: "" };
+    d.rates = [{ from: d.start, rate: "" }];
+    expect(validateDraft(d)).toEqual([]);
+    const p = draftToPayload(d, d.start, "") as { opening_balance: string; rates: { annual_rate_pct: string }[] };
+    expect(p.opening_balance).toBe("0");
+    expect(p.rates[0]!.annual_rate_pct).toBe("0");
+  });
+});

@@ -43,8 +43,8 @@ export function emptyDraft(start: Month): Draft {
   return {
     start,
     horizonMonths: "24",
-    openingBalance: "0",
-    rates: [{ from: start, rate: "0" }],
+    openingBalance: "",
+    rates: [{ from: start, rate: "" }],
     items: [],
   };
 }
@@ -86,14 +86,15 @@ export function validateDraft(d: Draft): DraftProblem[] {
   if (!isMonth(d.start)) add(null, "Start month is not valid.");
   const horizon = Number(d.horizonMonths);
   if (!Number.isInteger(horizon) || horizon < 1 || horizon > 240) add(null, "Horizon must be 1 to 240 months.");
-  if (!AMOUNT_RE.test(cleanAmount(d.openingBalance))) add(null, "Opening balance must be a number of 0 or more (max 2 decimals).");
+  // opening savings and interest are optional: empty = 0
+  if (!AMOUNT_RE.test(cleanAmount(d.openingBalance) || "0")) add(null, "Opening balance must be a number of 0 or more (max 2 decimals).");
 
   if (d.rates.length === 0) add(null, "Add the savings account interest rate.");
   const rateMonths = new Set<string>();
   d.rates.forEach((r) => {
     if (!isMonth(r.from)) add(null, "Every rate needs a valid month.");
     else if (isMonth(d.start) && r.from < d.start) add(null, `Rate change ${r.from} is before the plan start.`);
-    if (!RATE_RE.test(r.rate.trim()) || Number(r.rate) > 100) add(null, `Interest rate "${r.rate}" must be 0 to 100.`);
+    if (!RATE_RE.test(r.rate.trim() || "0") || Number(r.rate) > 100) add(null, `Interest rate "${r.rate}" must be 0 to 100.`);
     if (rateMonths.has(r.from)) add(null, `Two interest rates start in ${r.from}.`);
     rateMonths.add(r.from);
   });
@@ -142,9 +143,9 @@ export function draftToPayload(d: Draft, effectiveFrom: Month, note: string): Re
     start_month: d.start,
     effective_from: effectiveFrom,
     horizon_months: Number(d.horizonMonths),
-    opening_balance: cleanAmount(d.openingBalance),
+    opening_balance: cleanAmount(d.openingBalance) || "0",
     note,
-    rates: d.rates.map((r) => ({ from: r.from, annual_rate_pct: r.rate.trim() })),
+    rates: d.rates.map((r) => ({ from: r.from, annual_rate_pct: r.rate.trim() || "0" })),
     items: d.items.map((i) => {
       const amounts = i.amounts.map((a) => ({ month: a.month, amount: cleanAmount(a.amount) }));
       return {

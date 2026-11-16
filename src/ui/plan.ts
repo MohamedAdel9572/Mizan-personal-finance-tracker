@@ -592,8 +592,9 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
     </section>`;
   };
 
-  const rateText = d.rates.length > 1 ? `interest ${esc(d.rates[0]!.rate)}% (changes ${d.rates.length - 1}×)` : `interest ${esc(d.rates[0]?.rate ?? "0")}%`;
-  const settingsSummary = `Starts ${isMonth(d.start) ? monthLabel(d.start, true) : "?"} · ${esc(d.horizonMonths)} months · opening ${shownAmount(d.openingBalance)} · ${rateText}`;
+  const firstRate = d.rates[0]?.rate.trim() || "0";
+  const rateText = d.rates.length > 1 ? `interest ${esc(firstRate)}% (changes ${d.rates.length - 1}×)` : `interest ${esc(firstRate)}%`;
+  const settingsSummary = `Starts ${isMonth(d.start) ? monthLabel(d.start, true) : "?"} · ${esc(d.horizonMonths)} months · opening ${shownAmount(d.openingBalance || "0")} · ${rateText}`;
 
   root.innerHTML = `
     <form id="plan-editor" novalidate>
@@ -615,18 +616,19 @@ function renderEditor(root: HTMLElement, ctx: Ctx, sample: boolean): void {
           <div class="row-3">
             <label>Start month<input type="month" data-f="start" value="${esc(d.start)}"></label>
             <label>Length (months)<input inputmode="numeric" data-f="horizonMonths" value="${esc(d.horizonMonths)}"></label>
-            <label>Opening savings (EGP)<input inputmode="decimal" data-f="openingBalance" value="${esc(d.openingBalance)}"></label>
+            <label>Opening savings (EGP) <span class="muted small">(optional)</span><input inputmode="decimal" data-f="openingBalance" value="${esc(d.openingBalance)}" placeholder="0"></label>
           </div>
           ${end ? `<p class="muted small">Plan runs to ${esc(monthLabel(end, true))}.</p>` : ""}
           <div class="amounts">
             ${d.rates.map((r, k) => `
               <div class="amount-row">
-                ${k === 0 ? `<span class="amt-from">${d.rates.length > 1 ? "Interest at start" : "Annual interest"}</span>` : `<label><span class="sr-only">From month</span><input type="month" data-rate="${k}" data-f="from" value="${esc(r.from)}"></label>`}
-                <label class="suffix"><span class="sr-only">Rate</span><input inputmode="decimal" data-num="pct" maxlength="6" data-rate="${k}" data-f="rate" value="${esc(r.rate)}"><span>%</span></label>
+                ${k === 0 ? `<span class="amt-from">${d.rates.length > 1 ? "Interest at start" : "Annual interest"} <span class="muted small">(optional)</span></span>` : `<label><span class="sr-only">From month</span><input type="month" data-rate="${k}" data-f="from" value="${esc(r.from)}"></label>`}
+                <label class="suffix"><span class="sr-only">Rate</span><input inputmode="decimal" data-num="pct" maxlength="6" data-rate="${k}" data-f="rate" value="${esc(r.rate)}" placeholder="0"><span>%</span></label>
                 ${k === 0 ? "<span></span>" : `<button type="button" class="icon-btn danger" data-del-rate="${k}" aria-label="Remove rate">×</button>`}
               </div>`).join("")}
             <button type="button" class="btn ghost small" data-add-rate>+ Rate changes from…</button>
           </div>
+          <p class="muted small">Interest is only the plan's estimate. Months you log on the <a href="#/invest">Investments</a> page use your real profit / loss instead, so you can leave it empty.</p>
           <div class="item-done"><button type="button" class="btn ghost small" data-close-settings>Done</button></div>
         </fieldset>` : `
         <div class="item-row settings-row">
