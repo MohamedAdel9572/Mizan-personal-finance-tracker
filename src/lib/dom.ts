@@ -41,7 +41,8 @@ export async function busy<T>(form: HTMLFormElement, action: () => Promise<T>): 
   const submit = form.querySelector<HTMLButtonElement>("button[type=submit]");
   const label = submit?.textContent;
   controls.forEach((c) => (c.disabled = true));
-  if (submit) submit.textContent = "Saving…";
+  // the button can say what it's doing (data-busy="Signing in…"); "Saving…" otherwise
+  if (submit) submit.textContent = submit.dataset.busy ?? "Saving…";
   try {
     return await action();
   } finally {

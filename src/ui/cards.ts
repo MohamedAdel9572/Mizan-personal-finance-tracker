@@ -412,7 +412,7 @@ function linkLine(ctx: Ctx, card: CardRow, reload: () => void): void {
       </fieldset>
       <div class="dialog-actions">
         <button type="button" class="btn ghost" data-close>Cancel</button>
-        <button type="submit" class="btn primary">Link</button>
+        <button type="submit" class="btn primary" data-busy="Linking…">Link</button>
       </div>
     </form>`, (dialog) => {
     const form = dialog.querySelector<HTMLFormElement>("#link-form")!;

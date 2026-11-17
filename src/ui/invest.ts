@@ -327,7 +327,7 @@ function editMove(ctx: Ctx, id: number | null, reload: () => void): void {
       <div class="dialog-actions">
         ${v ? `<button type="button" class="btn ghost danger-text" id="delete-move">Delete</button><span class="spacer"></span>` : ""}
         <button type="button" class="btn ghost" data-close>Cancel</button>
-        <button type="submit" class="btn primary">${v ? "Save" : "Move"}</button>
+        <button type="submit" class="btn primary" data-busy="${v ? "Saving…" : "Moving…"}">${v ? "Save" : "Move"}</button>
       </div>
     </form>`, (dialog) => {
     const form = dialog.querySelector<HTMLFormElement>("#move-form")!;

@@ -51,13 +51,13 @@ export function renderSettings(root: HTMLElement, ctx: Ctx, onSignedOut: () => v
         <label>New password<input type="password" name="new1" autocomplete="new-password"></label>
         <label>Repeat new password<input type="password" name="new2" autocomplete="new-password"></label>
         <p class="muted small">Other devices will be signed out.</p>
-        <button class="btn primary" type="submit">Change password</button>
+        <button class="btn primary" type="submit" data-busy="Changing password…">Change password</button>
       </form>
       <form class="card danger-zone" id="del" novalidate>
         <h2>Delete account</h2>
         <p class="muted small">Deletes your plan, every version, all actuals, gold and history. This can't be undone.</p>
         <label>Type your password to confirm<input type="password" name="password" autocomplete="current-password"></label>
-        <button class="btn danger" type="submit">Delete my account</button>
+        <button class="btn danger" type="submit" data-busy="Deleting…">Delete my account</button>
       </form>
     </div>`;
 

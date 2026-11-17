@@ -23,7 +23,7 @@ export function renderLogin(root: HTMLElement, api: Api, onSignedIn: () => void)
     <form id="login" novalidate>
       <label>Mobile number<input name="mobile" type="tel" inputmode="tel" autocomplete="username" required></label>
       <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
-      <button class="btn primary block" type="submit">Sign in</button>
+      <button class="btn primary block" type="submit" data-busy="Signing in…">Sign in</button>
     </form>
     <div class="auth-switch"><span class="muted small">No account yet?</span><a class="btn ghost block" href="#/signup">Create an account</a></div>`);
 
@@ -61,7 +61,7 @@ export function renderSignup(root: HTMLElement, api: Api, onSignedIn: () => void
       <label>Password <span class="muted small">(8 or more characters)</span>
         <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required></label>
       <label>Repeat password<input name="password2" type="password" autocomplete="new-password" required></label>
-      <button class="btn primary block" type="submit">Create account</button>
+      <button class="btn primary block" type="submit" data-busy="Creating account…">Create account</button>
     </form>
     <div class="auth-switch"><span class="muted small">Already registered?</span><a class="btn ghost block" href="#/login">Sign in</a></div>`);
 
